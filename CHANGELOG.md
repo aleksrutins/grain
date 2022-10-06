@@ -1,5 +1,23 @@
 # Changelog
 
+### [0.5.4](https://github.com/grain-lang/grain/compare/grain-v0.5.3...grain-v0.5.4) (2022-10-06)
+
+
+### Features
+
+* **compiler:** Allow custom infix operators ([#1419](https://github.com/grain-lang/grain/issues/1419)) ([cc9b8b5](https://github.com/grain-lang/grain/commit/cc9b8b5f251268c59ff6739436bd3b8881e8fd56))
+
+
+### Bug Fixes
+
+* **compiler:** Use option converter for `--profile` argument ([#1432](https://github.com/grain-lang/grain/issues/1432)) ([57776f2](https://github.com/grain-lang/grain/commit/57776f224904f2d422923a1a947b5acbe435cfa4))
+* **grainfmt:** Handle comments within lists ([#1429](https://github.com/grain-lang/grain/issues/1429)) ([05b5f52](https://github.com/grain-lang/grain/commit/05b5f525fea50db20b49b4b5cb88c4b0259d2805))
+* **grainfmt:** Handle source files with no code, only comments ([#1411](https://github.com/grain-lang/grain/issues/1411)) ([a435d60](https://github.com/grain-lang/grain/commit/a435d60f4c8f8c85ec28ea8a29e76d0ceea0284b))
+* **grainfmt:** Print comments found between comma-separated data statements ([#1430](https://github.com/grain-lang/grain/issues/1430)) ([be4b38d](https://github.com/grain-lang/grain/commit/be4b38d87b0ee6ff4544264b8bad4e36820808a2))
+* **grainfmt:** Properly format comments within a record ([#1435](https://github.com/grain-lang/grain/issues/1435)) ([3c56097](https://github.com/grain-lang/grain/commit/3c56097e867a83698f26e287dbaeaee7e831efb8))
+* **grainfmt:** Stop adding an extra line after block comments ([#1436](https://github.com/grain-lang/grain/issues/1436)) ([4e4903f](https://github.com/grain-lang/grain/commit/4e4903f238a3804e687b1a430ec7896f7a145271))
+* **stdlib:** Fix anchoring behavior in Regex.replaceAll ([#1440](https://github.com/grain-lang/grain/issues/1440)) ([d513eff](https://github.com/grain-lang/grain/commit/d513effe569d0aa0d44c974596fd285f1ad8d57d))
+
 ### [0.5.3](https://github.com/grain-lang/grain/compare/grain-v0.5.2...grain-v0.5.3) (2022-08-05)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.5.4](https://github.com/grain-lang/grain/compare/stdlib-v0.5.3...stdlib-v0.5.4) (2022-10-06)
+
+
+### Bug Fixes
+
+* **stdlib:** Fix anchoring behavior in Regex.replaceAll ([#1440](https://github.com/grain-lang/grain/issues/1440)) ([d513eff](https://github.com/grain-lang/grain/commit/d513effe569d0aa0d44c974596fd285f1ad8d57d))
+
 ### [0.5.3](https://github.com/grain-lang/grain/compare/stdlib-v0.5.2...stdlib-v0.5.3) (2022-08-05)
 
 
