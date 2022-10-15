@@ -47,4 +47,7 @@ describe("formatter", ({test, testSkip}) => {
   assertFormatOutput("patterns", "patterns");
   assertFormatOutput("rationals", "rationals");
   assertFormatOutput("constraints", "constraints");
+  assertFormatOutput("only_comments", "only_comments");
+  assertFormatOutput("data_docs", "data_docs");
+  assertFormatOutput("custom_operators", "custom_operators");
 });
