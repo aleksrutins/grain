@@ -52,6 +52,9 @@ let process = msg => {
   | TextDocumentCompletion(id, params) when is_initialized^ =>
     Completion.process(~id, ~compiled_code, ~cached_code=compiled_code, ~documents, params);
     Reading;
+  | CompletionItemResolve(id, params) when is_initialized^ =>
+    Completion.Resolution.process(~id, ~compiled_code, ~cached_code=compiled_code, ~documents, params);
+    Reading;
   | _ =>
     // If we don't get initialize as the first event we stop the server
     // this signals to the client to restart
