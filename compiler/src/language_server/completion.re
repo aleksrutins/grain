@@ -110,19 +110,15 @@ let find_completable = (text, offset) => {
           Trace.log_opt(String_utils.char_at(text, i) |> Option.bind(_, c => Some(String.make(1, c))));
           loop(i - 1)
         | _ =>
-          i == offset - 1
-            ? None
-            : {
-              let res = Some(
-                String_utils.slice(
-                  ~first=i,
-                  ~last=offset-1,
-                  text,
-                ),
-              );
-              Trace.log_opt(res);
-              res
-            }
+          let res = Some(
+            String_utils.slice(
+              ~first=i,
+              ~last=offset,
+              text,
+            ),
+          );
+          Trace.log_opt(res);
+          res
         }
       );
   };
@@ -138,9 +134,7 @@ let get_original_text = (documents, uri, line, char) =>
     Trace.log(source_code ++ "\n" ++ string_of_int(line));
     let line = Option.bind(List.nth_opt(lines, line), line => Some(String.trim(line)));
     Trace.log_opt(line)
-    // UGH, this is really not nice:
-    let old_char = char > 0 ? char - 1 : char; // the position is against the earlier version of the document so move back 1
-    Option.bind(line, line => find_completable(line, old_char));
+    Option.bind(line, line => find_completable(line, char));
   };
 
 // maps Grain types to LSP CompletionItemKind
