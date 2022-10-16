@@ -7,3 +7,4 @@ module RequestParams: {
 
 let set_level: string => unit;
 let log: (~verbose: string=?, string) => unit;
+let log_opt: (~verbose: string=?, option(string)) => unit;

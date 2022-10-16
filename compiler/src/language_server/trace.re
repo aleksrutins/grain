@@ -46,3 +46,14 @@ let log = (~verbose=?, message: string) =>
       NotificationParams.to_yojson({message, verbose}),
     )
   };
+
+let log_opt = (~verbose=?, message) => {
+  let msg = switch(message) {
+    | Some(thing) => "Some(" ++ thing ++ ")"
+    | None => "None"
+  };
+  switch(verbose) {
+    | Some(verbose) => log(~verbose, msg)
+    | None => log(msg)
+  };
+};
