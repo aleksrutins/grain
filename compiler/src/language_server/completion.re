@@ -105,7 +105,7 @@ let find_completable = (text, offset) => {
     i < 0
       ? Some(String_utils.slice(~first=0, ~last=offset + 1, text))
       : (
-        switch (String_utils.char_at(text, i)) {
+        switch (String_utils.char_at(text, i - 1)) {
         | Some('a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '.' | '_') =>
           Trace.log_opt(String_utils.char_at(text, i) |> Option.bind(_, c => Some(String.make(1, c))));
           loop(i - 1)
@@ -115,8 +115,8 @@ let find_completable = (text, offset) => {
             : {
               let res = Some(
                 String_utils.slice(
-                  ~first=i + 1,
-                  ~last=offset - (i + 1),
+                  ~first=i,
+                  ~last=offset-1,
                   text,
                 ),
               );
