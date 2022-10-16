@@ -132,8 +132,8 @@ let get_original_text = (documents, uri, line, char) =>
   | Some(source_code) =>
     let lines = String.split_on_char('\n', source_code);
     Trace.log(source_code ++ "\n" ++ string_of_int(line));
-    let line = Option.bind(List.nth_opt(lines, line), line => Some(String.trim(line)));
-    Trace.log_opt(line)
+    let line = List.nth_opt(lines, line);
+    Trace.log_opt(line);
     Option.bind(line, line => find_completable(line, char));
   };
 
