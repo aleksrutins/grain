@@ -235,18 +235,16 @@ let process =
       switch (completable) {
       | None => send_completion(~id, complete_all(compiled_code))
       | Some(prior_version_text) =>
-        let text = prior_version_text;
-        Trace.log(text);
-          // switch (params.context) {
-          // | None => prior_version_text
-          // | Some(ctx) =>
-          //   switch (ctx.trigger_kind) {
-          //   | CompletionTriggerCharacter =>
-          //     prior_version_text
-          //     ++ Option.value(~default="", ctx.trigger_character)
-          //   | _ => prior_version_text
-          //   }
-          // };
+        let text = switch (params.context) {
+        | None => prior_version_text
+        | Some(ctx) =>
+          switch (ctx.trigger_kind) {
+          | CompletionTriggerCharacter =>
+            prior_version_text
+            ++ Option.value(~default="", ctx.trigger_character)
+          | _ => prior_version_text
+          }
+        };
         let modules =
           Env.fold_modules(
             (tag, path, decl, acc) => {
