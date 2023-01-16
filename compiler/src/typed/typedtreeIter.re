@@ -122,7 +122,6 @@ module MakeIterator =
     Iter.leave_data_declaration(decl);
   }
 
-  /* FIXME: These two functions are gross */
   and iter_toplevel_stmt = stmt => {
     Iter.enter_toplevel_stmt(stmt);
     switch (stmt.ttop_desc) {
@@ -137,7 +136,6 @@ module MakeIterator =
     };
     Iter.leave_toplevel_stmt(stmt);
   }
-
   and iter_toplevel_stmts = stmts =>
     List.iter(
       cur =>
@@ -216,13 +214,14 @@ module MakeIterator =
     | TExpMatch(value, branches, _) =>
       iter_expression(value);
       iter_match_branches(branches);
-    | TExpRecord(args) =>
+    | TExpRecord(b, args) =>
+      Option.iter(iter_expression, b);
       Array.iter(
         fun
         | (_, Overridden(_, expr)) => iter_expression(expr)
         | _ => (),
         args,
-      )
+      );
     | TExpRecordGet(expr, _, _) => iter_expression(expr)
     | TExpRecordSet(e1, _, _, e2) =>
       iter_expression(e1);
@@ -252,6 +251,7 @@ module MakeIterator =
       iter_expression(b);
     | TExpContinue
     | TExpBreak => ()
+    | TExpReturn(e) => Option.iter(iter_expression, e)
     };
     Iter.leave_expression(exp);
   };

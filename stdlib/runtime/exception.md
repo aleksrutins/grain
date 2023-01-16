@@ -1,9 +1,3 @@
-### Exception.**Option**
-
-```grain
-type Option<a>
-```
-
 ### Exception.**printers**
 
 ```grain
@@ -22,9 +16,15 @@ dangerouslyRegisterBasePrinter : a -> Void
 dangerouslyRegisterPrinter : a -> Void
 ```
 
-### Exception.**printException**
+### Exception.**panic**
 
 ```grain
-printException : Exception -> Void
+panic : String -> a
+```
+
+### Exception.**panicWithException**
+
+```grain
+panicWithException : Exception -> a
 ```
 

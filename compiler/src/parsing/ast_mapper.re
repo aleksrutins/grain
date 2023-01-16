@@ -63,10 +63,11 @@ module E = {
         sub.expr(sub, i),
         sub.expr(sub, arg),
       )
-    | PExpRecord(es) =>
+    | PExpRecord(b, es) =>
       record(
         ~loc,
         ~attributes,
+        Option.map(sub.expr(sub), b),
         List.map(
           ((name, expr)) => (map_loc(sub, name), sub.expr(sub, expr)),
           es,
@@ -122,6 +123,8 @@ module E = {
       )
     | PExpContinue => continue(~loc, ~attributes, ())
     | PExpBreak => break(~loc, ~attributes, ())
+    | PExpReturn(e) =>
+      return(~loc, ~attributes, Option.map(sub.expr(sub), e))
     | PExpLambda(pl, e) =>
       lambda(
         ~loc,
@@ -134,6 +137,13 @@ module E = {
         ~loc,
         ~attributes,
         sub.expr(sub, e),
+        List.map(sub.expr(sub), el),
+      )
+    | PExpConstruct(id, el) =>
+      construct(
+        ~loc,
+        ~attributes,
+        map_identifier(sub, id),
         List.map(sub.expr(sub), el),
       )
     | PExpBlock(el) => block(~loc, ~attributes, List.map(sub.expr(sub), el))

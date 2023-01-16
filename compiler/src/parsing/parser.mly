@@ -28,7 +28,7 @@ module Grain_parsing = struct end
 
 %token TRUE FALSE VOID
 
-%token LET MUT REC IF WHEN ELSE MATCH WHILE FOR CONTINUE BREAK
+%token LET MUT REC IF WHEN ELSE MATCH WHILE FOR CONTINUE BREAK RETURN
 %token AT
 
 %token <string> INFIX_10 INFIX_30 INFIX_40 INFIX_50 INFIX_60 INFIX_70
@@ -42,7 +42,7 @@ module Grain_parsing = struct end
 %token EOL EOF
 
 // reserved tokens
-%token TRY CATCH COLONCOLON
+%token TRY CATCH COLONCOLON MACRO YIELD
 
 // Not a real token, this is injected by the lexer
 %token FUN
@@ -63,7 +63,7 @@ module Grain_parsing = struct end
 %left INFIX_110 DASH
 %left INFIX_120 STAR SLASH
 
-%right SEMI EOL COMMA DOT COLON
+%right SEMI EOL COMMA DOT COLON LPAREN RETURN
 
 %nonassoc _if
 %nonassoc ELSE
@@ -104,6 +104,7 @@ module Grain_parsing = struct end
   pattern
   type_id
   value_binds
+  construct_expr
 
 %%
 
@@ -232,6 +233,7 @@ annotated_expr:
 
 binop_expr:
   | non_stmt_expr infix_op opt_eols non_stmt_expr { Exp.binop ~loc:(to_loc $loc) (mkid_expr $loc($2) [mkstr $loc($2) $2]) [$1; $4] }
+  | non_stmt_expr rcaret_rcaret_op opt_eols non_stmt_expr %prec INFIX_100 { Exp.binop ~loc:(to_loc $loc) (mkid_expr $loc($2) [mkstr $loc($2) $2]) [$1; $4] }
 
 ellipsis_prefix(X):
   | ELLIPSIS X {$2}
@@ -308,7 +310,7 @@ value_binds:
   | lseparated_nonempty_list(comma, value_bind) { $1 }
 
 import_exception:
-  | EXCEPT lbrace lseparated_nonempty_list(comma, id) comma? rbrace {$3}
+  | EXCEPT lbrace lseparated_nonempty_list(comma, any_id) comma? rbrace {$3}
 
 as_prefix(X):
   | AS X {$2}
@@ -317,10 +319,12 @@ aliasable(X):
   | X as_prefix(X)? {($1, $2)}
 
 import_ids:
-  | lseparated_nonempty_list(comma, aliasable(id)) comma? {$1}
+  | lseparated_nonempty_list(comma, aliasable(any_id)) comma? {$1}
 
 import_shape:
-  | id { PImportModule $1 }
+  | simple_id { PImportModule $1 }
+  | type_id { PImportModule $1 }
+  | special_id { PImportModule (mkid [$1] (to_loc $loc)) }
   | STAR import_exception? { PImportAllExcept (Option.value ~default:[] $2) }
   | lbrace import_ids? rbrace { PImportValues (Option.value ~default:[] $2) }
 
@@ -376,7 +380,7 @@ data_declaration:
   | ENUM UIDENT id_vec? data_constructors { Dat.variant ~loc:(to_loc $loc) (mkstr $loc($2) $2) (Option.value ~default:[] $3) $4 }
   | RECORD UIDENT id_vec? data_labels { Dat.record ~loc:(to_loc $loc) (mkstr $loc($2) $2) (Option.value ~default:[] $3) $4 }
 
-prim1_expr:
+unop_expr:
   | prefix_op non_assign_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) [mkstr $loc($1) $1]) [$2] }
 
 paren_expr:
@@ -384,6 +388,13 @@ paren_expr:
 
 app_expr:
   | left_accessor_expr lparen lseparated_list(comma, expr) comma? rparen { Exp.apply ~loc:(to_loc $loc) $1 $3 }
+
+rcaret_rcaret_op:
+  | lnonempty_list(RCARET) RCARET { (String.init (1 + List.length $1) (fun _ -> '>')) }
+
+construct_expr:
+  | type_id lparen lseparated_list(comma, expr) comma? rparen { Exp.construct ~loc:(to_loc $loc) $1 $3 }
+  | type_id %prec LPAREN { Exp.construct ~loc:(to_loc $loc) $1 [] }
 
 // These are all inlined to carry over their precedence.
 %inline infix_op:
@@ -402,7 +413,7 @@ app_expr:
   | DASH { "-" }
   | PIPE { "|" }
   | LCARET { "<" }
-  | llist(RCARET) RCARET { (String.init (1 + List.length $1) (fun _ -> '>')) }
+  | RCARET { ">" }
 
 %inline prefix_op:
   | PREFIX_150 {$1}
@@ -413,7 +424,7 @@ primitive_:
   | FAIL { "fail" }
 
 special_op:
-  | infix_op | prefix_op {$1}
+  | infix_op | rcaret_rcaret_op | prefix_op {$1}
 
 %inline special_id:
   | lparen special_op rparen { mkstr $loc($2) $2 }
@@ -426,14 +437,17 @@ non_modid:
 
 id:
   | modid dot non_modid { mkid (List.append $1 $3) (to_loc $loc) }
-  | modid %prec DOT { (mkid $1) (to_loc $loc) }
   | non_modid { (mkid $1) (to_loc $loc) }
 
 simple_id:
   | LIDENT { (mkid [mkstr $loc $1]) (to_loc $loc) }
 
 type_id:
-  | lseparated_nonempty_list(dot, type_id_str) { (mkid $1) (to_loc $loc) }
+  | lseparated_nonempty_list(dot, type_id_str) %prec DOT { (mkid $1) (to_loc $loc) }
+
+any_id:
+  | id
+  | type_id { $1 }
 
 id_expr:
   // Force any following colon to cause a shift
@@ -446,7 +460,7 @@ simple_expr:
 
 braced_expr:
   | lbrace block_body rbrace { Exp.block ~loc:(to_loc $loc) $2 }
-  | lbrace record_exprs rbrace { Exp.record ~loc:(to_loc $loc) $2 }
+  | lbrace record_exprs rbrace { Exp.record_fields ~loc:(to_loc $loc) $2 }
 
 block:
   | lbrace block_body rbrace { Exp.block ~loc:(to_loc $loc) $2 }
@@ -517,6 +531,7 @@ stmt_expr:
   | THROW expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) [mkstr $loc($1) "throw"]) [$2] }
   | ASSERT expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) [mkstr $loc($1) "assert"]) [$2] }
   | FAIL expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) [mkstr $loc($1) "fail"]) [$2] }
+  | RETURN ioption(expr) { Exp.return ~loc:(to_loc $loc) $2 }
   | CONTINUE { Exp.continue ~loc:(to_loc $loc) () }
   | BREAK { Exp.break ~loc:(to_loc $loc) () }
 
@@ -531,27 +546,23 @@ assign_expr:
   | array_set { $1 }
 
 non_assign_expr:
-  | app_expr    { $1 }
-  | prim1_expr  { $1 }
-  | simple_expr { $1 }
-  | record_get  { $1 }
-  | paren_expr  { $1 }
-  | braced_expr { $1 }
-  | if_expr     { $1 }
-  | while_expr  { $1 }
-  | for_expr    { $1 }
-  | match_expr  { $1 }
-  | list_expr   { $1 }
-  | array_get   { $1 }
-  | array_expr  { $1 }
+  | left_accessor_expr { $1 }
+  | unop_expr          { $1 }
+  | if_expr            { $1 }
+  | while_expr         { $1 }
+  | for_expr           { $1 }
+  | match_expr         { $1 }
 
-%inline left_accessor_expr:
-  | app_expr    { $1 }
-  | simple_expr { $1 }
-  | array_get   { $1 }
-  | record_get  { $1 }
-  | paren_expr  { $1 }
-  | braced_expr { $1 }
+left_accessor_expr:
+  | app_expr       { $1 }
+  | construct_expr { $1 }
+  | simple_expr    { $1 }
+  | array_get      { $1 }
+  | record_get     { $1 }
+  | paren_expr     { $1 }
+  | braced_expr    { $1 }
+  | list_expr      { $1 }
+  | array_expr     { $1 }
 
 block_body_expr:
   | let_expr    { $1 }
@@ -580,14 +591,18 @@ record_set:
   | colon expr {$2}
 
 punned_record_field:
-  | id { $1, (Exp.ident ~loc:(to_loc $loc) $1) }
+  | id { RecordItem ($1, (Exp.ident ~loc:(to_loc $loc) $1)) }
 
 non_punned_record_field:
-  | id record_field_value { $1, $2 }
+  | id record_field_value { RecordItem ($1, $2) }
+
+spread_record_field:
+  | ELLIPSIS expr { RecordSpread ($2, to_loc $loc) }
 
 %inline record_field:
   | punned_record_field { $1 }
   | non_punned_record_field { $1 }
+  | spread_record_field { $1 }
 
 record_exprs:
   // Don't ever parse {x} as a record

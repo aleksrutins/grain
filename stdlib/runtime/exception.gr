@@ -9,10 +9,7 @@ import foreign wasm fd_write: (
   WasmI32,
 ) -> WasmI32 from "wasi_snapshot_preview1"
 
-enum Option<a> {
-  Some(a),
-  None,
-}
+primitive unreachable: () -> a = "@unreachable"
 
 export let mut printers = 0n
 
@@ -79,8 +76,8 @@ let exceptionToString = (e: Exception) => {
 // the runtime heap, but this is the only module that needs to do it
 let iov = WasmI32.fromGrain([> 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n])
 
-export let printException = (e: Exception) => {
-  let ptr = WasmI32.fromGrain(exceptionToString(e))
+export let panic = (msg: String) => {
+  let ptr = WasmI32.fromGrain(msg)
   let written = iov + 32n
   let lf = iov + 36n
   WasmI32.store(iov, ptr + 8n, 0n)
@@ -89,10 +86,13 @@ export let printException = (e: Exception) => {
   WasmI32.store(iov, lf, 8n)
   WasmI32.store(iov, 1n, 12n)
   fd_write(2n, iov, 2n, written)
-  void
+  unreachable()
 }
 
-export exception IndexOutOfBounds
+export let panicWithException = (e: Exception) => {
+  panic(exceptionToString(e))
+}
+
 export exception DivisionByZero
 export exception ModuloByZero
 export exception Overflow
@@ -107,13 +107,13 @@ export exception MatchFailure
  * this file to construct the error, but constructing a string in this module is impractical as we
  * don't have access to memory allocation since malloc.gr depends on this module.
  */
-export exception AssertionError(String)
+
 export exception InvalidArgument(String)
-export exception OutOfMemory
 
 let runtimeErrorPrinter = e => {
   match (e) {
     IndexOutOfBounds => Some("IndexOutOfBounds: Index out of bounds"),
+    IndexNonInteger => Some("IndexNonInteger: Index not an integer"),
     DivisionByZero => Some("DivisionByZero: Division by zero"),
     ModuloByZero => Some("ModuloByZero: Modulo by zero"),
     Overflow => Some("Overflow: Number overflow"),
@@ -123,7 +123,6 @@ let runtimeErrorPrinter = e => {
       Some("NumberNotRational: Can't coerce number to rational"),
     MatchFailure => Some("MatchFailure: No matching pattern"),
     AssertionError(s) => Some(s),
-    OutOfMemory => Some("OutOfMemory: Maximum memory size exceeded"),
     InvalidArgument(msg) => Some(msg),
     _ => None,
   }

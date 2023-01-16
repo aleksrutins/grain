@@ -24,6 +24,10 @@ type listitem('a) =
   | ListItem('a)
   | ListSpread('a, Location.t);
 
+type recorditem =
+  | RecordItem(loc(Identifier.t), expression)
+  | RecordSpread(expression, Location.t);
+
 type id = loc(Identifier.t);
 type str = loc(string);
 type loc = Location.t;
@@ -192,8 +196,47 @@ module Exp = {
     mk(~loc?, ~attributes?, PExpConstant(a));
   let tuple = (~loc=?, ~attributes=?, a) =>
     mk(~loc?, ~attributes?, PExpTuple(a));
-  let record = (~loc=?, ~attributes=?, a) =>
-    mk(~loc?, ~attributes?, PExpRecord(a));
+  let record = (~loc=?, ~attributes=?, a, b) =>
+    mk(~loc?, ~attributes?, PExpRecord(a, b));
+  let record_fields = (~loc=?, ~attributes=?, a) =>
+    switch (a) {
+    | [] => failwith("Impossible: empty record field list")
+    | [base, ...rest] =>
+      let (spread_base, record_items) =
+        switch (base) {
+        | RecordItem(id, expr) => (None, [(id, expr)])
+        | RecordSpread(expr, _) => (Some(expr), [])
+        };
+      let record_items =
+        List.fold_left(
+          (acc, expr) => {
+            switch (expr) {
+            | RecordItem(id, expr) => [(id, expr), ...acc]
+            | RecordSpread(_, loc) =>
+              switch (spread_base) {
+              | None =>
+                raise(
+                  SyntaxError(
+                    loc,
+                    "A record spread can only appear at the beginning of a record expression.",
+                  ),
+                )
+              | Some(_) =>
+                raise(
+                  SyntaxError(
+                    loc,
+                    "A record expression may only contain one record spread.",
+                  ),
+                )
+              }
+            }
+          },
+          record_items,
+          rest,
+        );
+      let record_items = List.rev(record_items);
+      record(~loc?, ~attributes?, spread_base, record_items);
+    };
   let record_get = (~loc=?, ~attributes=?, a, b) =>
     mk(~loc?, ~attributes?, PExpRecordGet(a, b));
   let record_set = (~loc=?, ~attributes=?, a, b, c) =>
@@ -226,6 +269,8 @@ module Exp = {
     mk(~loc?, ~attributes?, PExpContinue);
   let break = (~loc=?, ~attributes=?, ()) =>
     mk(~loc?, ~attributes?, PExpBreak);
+  let return = (~loc=?, ~attributes=?, a) =>
+    mk(~loc?, ~attributes?, PExpReturn(a));
   let constraint_ = (~loc=?, ~attributes=?, a, b) =>
     mk(~loc?, ~attributes?, PExpConstraint(a, b));
   let box_assign = (~loc=?, ~attributes=?, a, b) =>
@@ -236,6 +281,8 @@ module Exp = {
     mk(~loc?, ~attributes?, PExpLambda(a, b));
   let apply = (~loc=?, ~attributes=?, a, b) =>
     mk(~loc?, ~attributes?, PExpApp(a, b));
+  let construct = (~loc=?, ~attributes=?, a, b) =>
+    mk(~loc?, ~attributes?, PExpConstruct(a, b));
   // It's difficult to parse rational numbers while division exists (in the
   // parser state where you've read NUMBER_INT and you're looking ahead at /,
   // you've got a shift/reduce conflict between reducing const -> NUMBER_INT
@@ -280,21 +327,22 @@ module Exp = {
   let block = (~loc=?, ~attributes=?, a) =>
     mk(~loc?, ~attributes?, PExpBlock(a));
   let list = (~loc=?, ~attributes=?, a) => {
-    let empty = ident(~loc?, ident_empty);
-    let cons = ident(ident_cons);
+    let empty = construct(~loc?, ident_empty, []);
     let list =
       switch (List.rev(a)) {
       | [] => empty
       | [base, ...rest] =>
         let base =
           switch (base) {
-          | ListItem(expr) => apply(~attributes?, cons, [expr, empty])
+          | ListItem(expr) =>
+            construct(~attributes?, ident_cons, [expr, empty])
           | ListSpread(expr, _) => expr
           };
         List.fold_left(
           (acc, expr) => {
             switch (expr) {
-            | ListItem(expr) => apply(~attributes?, cons, [expr, acc])
+            | ListItem(expr) =>
+              construct(~attributes?, ident_cons, [expr, acc])
             | ListSpread(_, loc) =>
               raise(
                 SyntaxError(

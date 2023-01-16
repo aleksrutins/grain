@@ -28,29 +28,6 @@ enum List<a> {
 
 The type of Grain lists.
 
-### Pervasives.**Option**
-
-```grain
-enum Option<a> {
-  Some(a),
-  None,
-}
-```
-
-Grain's type representing something that may or may not contain data.
-Think of this like a better, type-safe "null".
-
-### Pervasives.**Result**
-
-```grain
-enum Result<t, e> {
-  Ok(t),
-  Err(e),
-}
-```
-
-Grain's type representing the result of something that might error.
-
 ## Boolean operations
 
 Infix functions for working with Boolean values.
@@ -942,13 +919,18 @@ assert : Bool -> Void
 ```
 
 Assert that the given Boolean condition is `true`.
-Throws an `AssertionError` if the condition is `false`.
 
 Parameters:
 
 |param|type|description|
 |-----|----|-----------|
 |`condition`|`Bool`|The condition to assert|
+
+Throws:
+
+`AssertionError`
+
+* When the `condition` is false
 
 Examples:
 

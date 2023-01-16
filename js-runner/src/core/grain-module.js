@@ -108,12 +108,20 @@ export class GrainModule {
     return !!this.exports["_start"];
   }
 
+  get hasTypeMetadata() {
+    return !!this.exports["_gtype_metadata"];
+  }
+
   requiredExport(key) {
     let exports = this.exports;
     if (!(key in exports)) {
       throw new Error(`Module ${this.name} missing required export: ${key}`);
     }
     return exports[key];
+  }
+
+  loadTypeMetadata() {
+    return this.requiredExport("_gtype_metadata")();
   }
 
   start() {
@@ -248,7 +256,8 @@ export async function readFile(filepath) {
 }
 
 export async function readURL(url) {
-  let modname = url; // FIXME
+  // TODO(#1537): Switch to using the real module name over the url
+  let modname = url;
   let response = await fetch(url);
   if (!response.ok)
     throw new Error(`[Grain] Could not load ${url} due to a network error.`);

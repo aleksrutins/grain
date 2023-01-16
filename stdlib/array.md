@@ -83,6 +83,13 @@ Returns:
 |----|-----------|
 |`Array<a>`|The new array|
 
+Throws:
+
+`InvalidArgument(String)`
+
+* When `length` is not an integer
+* When `length` is negative
+
 Examples:
 
 ```grain
@@ -116,6 +123,13 @@ Returns:
 |type|description|
 |----|-----------|
 |`Array<a>`|The new array|
+
+Throws:
+
+`InvalidArgument(String)`
+
+* When `length` is not an integer
+* When `length` is negative
 
 Examples:
 
@@ -550,7 +564,7 @@ No other changes yet.
 </details>
 
 ```grain
-flatMap : ((a -> Array<b>), Array<a>) -> Array<b>
+flatMap : ((b -> Array<a>), Array<b>) -> Array<a>
 ```
 
 Produces a new array by calling a function on each element
@@ -562,14 +576,14 @@ Parameters:
 
 |param|type|description|
 |-----|----|-----------|
-|`fn`|`a -> Array<b>`|The function to be called on each element, where the value returned will be an array that gets appended to the new array|
-|`array`|`Array<a>`|The array to iterate|
+|`fn`|`b -> Array<a>`|The function to be called on each element, where the value returned will be an array that gets appended to the new array|
+|`array`|`Array<b>`|The array to iterate|
 
 Returns:
 
 |type|description|
 |----|-----------|
-|`Array<b>`|The new array|
+|`Array<a>`|The new array|
 
 ### Array.**every**
 
@@ -986,9 +1000,16 @@ Returns:
 
 ### Array.**zip**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>next</code></td><td>Support zipping arrays of different sizes</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -998,8 +1019,6 @@ zip : (Array<a>, Array<b>) -> Array<(a, b)>
 Produces a new array filled with tuples of elements from both given arrays.
 The first tuple will contain the first item of each array, the second tuple
 will contain the second item of each array, and so on.
-
-Calling this function with arrays of different sizes will throw an error.
 
 Parameters:
 
@@ -1013,6 +1032,12 @@ Returns:
 |type|description|
 |----|-----------|
 |`Array<(a, b)>`|The new array containing indexed pairs of `(a, b)`|
+
+Throws:
+
+`Failure(String)`
+
+* When the arrays have different sizes
 
 ### Array.**zipWith**
 
@@ -1164,19 +1189,27 @@ Parameters:
 
 ### Array.**rotate**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.5</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.5</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>next</code></td><td>Behavior changed from right-rotation to left-rotation</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
 rotate : (Number, Array<a>) -> Void
 ```
 
-Rotates array elements by the specified amount to the right, in place.
+Rotates array elements in place by the specified amount to the left, such
+that the `n`th element becomes the first in the array.
 
 If value is negative, array elements will be rotated by the
-specified amount to the left. See examples.
+specified amount to the right. See examples.
 
 Parameters:
 
@@ -1188,10 +1221,10 @@ Parameters:
 Examples:
 
 ```grain
-let array = [> 1, 2, 3, 4, 5]; rotate(2, arr); arr == [> 4, 5, 1, 2, 3]
+let array = [> 1, 2, 3, 4, 5]; rotate(2, arr); arr == [> 3, 4, 5, 1, 2]
 ```
 
 ```grain
-let array = [> 1, 2, 3, 4, 5]; rotate(-1, arr); arr == [> 2, 3, 4, 5, 1]
+let array = [> 1, 2, 3, 4, 5]; rotate(-1, arr); arr == [> 5, 1, 2, 3, 4]
 ```
 

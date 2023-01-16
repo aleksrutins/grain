@@ -1,5 +1,75 @@
 # Changelog
 
+### [0.5.13](https://github.com/grain-lang/grain/compare/cli-v0.5.12...cli-v0.5.13) (2023-01-07)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.12](https://github.com/grain-lang/grain/compare/cli-v0.5.11...cli-v0.5.12) (2023-01-05)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.11](https://github.com/grain-lang/grain/compare/cli-v0.5.10...cli-v0.5.11) (2022-12-29)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.10](https://github.com/grain-lang/grain/compare/cli-v0.5.9...cli-v0.5.10) (2022-12-23)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.9](https://github.com/grain-lang/grain/compare/cli-v0.5.8...cli-v0.5.9) (2022-12-14)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.8](https://github.com/grain-lang/grain/compare/cli-v0.5.7...cli-v0.5.8) (2022-12-10)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.7](https://github.com/grain-lang/grain/compare/cli-v0.5.6...cli-v0.5.7) (2022-12-06)
+
+
+### Bug Fixes
+
+* **compiler:** Prevent stack overflows when compiling long blocks ([#1534](https://github.com/grain-lang/grain/issues/1534)) ([dc6d699](https://github.com/grain-lang/grain/commit/dc6d699cffeefa71ef2898c484f840c991f66c7a))
+
+### [0.5.6](https://github.com/grain-lang/grain/compare/cli-v0.5.5...cli-v0.5.6) (2022-12-05)
+
+
+### Bug Fixes
+
+* **compiler:** Increase JS stack size ([#1532](https://github.com/grain-lang/grain/issues/1532)) ([9d1ff1f](https://github.com/grain-lang/grain/commit/9d1ff1f427f2b2a92aa7958cf84b2d1026b1bac5))
+
+### [0.5.5](https://github.com/grain-lang/grain/compare/cli-v0.5.4...cli-v0.5.5) (2022-12-05)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
+### [0.5.4](https://github.com/grain-lang/grain/compare/cli-v0.5.3...cli-v0.5.4) (2022-11-12)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize Grain versions
+
 ### [0.5.3](https://github.com/grain-lang/grain/compare/cli-v0.5.2...cli-v0.5.3) (2022-08-05)
 
 

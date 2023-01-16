@@ -103,30 +103,82 @@ let parse_program_for_syntax_error = (~name=?, lexbuf, source) => {
   I.loop_handle(succeed, fail(source, buffer), supplier, checkpoint);
 };
 
+let cached_parsetrees = Hashtbl.create(64);
+let reset = () => Hashtbl.clear(cached_parsetrees);
+
+let get_cached_parsetree = name => {
+  Option.fold(~none=None, ~some=Hashtbl.find_opt(cached_parsetrees), name);
+};
+
 let parse = (~name=?, lexbuf, source): Parsetree.parsed_program => {
-  Sedlexing.set_position(lexbuf, Location.start_pos);
-  Option.iter(n => apply_filename_to_lexbuf(n, lexbuf), name);
-  let lexer = Wrapped_lexer.init(lexbuf);
-  let token = _ => Wrapped_lexer.token(lexer);
-  try({...parse_program(token, lexbuf), comments: Lexer.consume_comments()}) {
-  | Sedlexing.MalFormed =>
-    raise(Ast_helper.BadEncoding(Location.curr(lexbuf)))
-  | Parser.Error =>
-    // Fast parse failed, so now we do a slow, thoughtful parse to produce a
-    // good error message.
-    let source = source();
-    ignore @@
-    parse_program_for_syntax_error(
-      ~name?,
-      Sedlexing.Utf8.from_string(source),
-      source,
-    );
-    // This should never be hit, but if it does someone will see and report
-    failwith("Impossible: Program with syntax error raised no error");
+  switch (get_cached_parsetree(name)) {
+  | Some(cached) => cached
+  | None =>
+    Sedlexing.set_position(lexbuf, Location.start_pos);
+    Option.iter(n => apply_filename_to_lexbuf(n, lexbuf), name);
+    let lexer = Wrapped_lexer.init(lexbuf);
+    let token = _ => Wrapped_lexer.token(lexer);
+    let program =
+      try({
+        ...parse_program(token, lexbuf),
+        comments: Lexer.consume_comments(),
+      }) {
+      | Sedlexing.MalFormed =>
+        raise(Ast_helper.BadEncoding(Location.curr(lexbuf)))
+      | Parser.Error =>
+        // Fast parse failed, so now we do a slow, thoughtful parse to produce a
+        // good error message.
+        let source = source();
+        ignore @@
+        parse_program_for_syntax_error(
+          ~name?,
+          Sedlexing.Utf8.from_string(source),
+          source,
+        );
+        // This should never be hit, but if it does someone will see and report
+        failwith("Impossible: Program with syntax error raised no error");
+      };
+    switch (name) {
+    | Some(name) => Hashtbl.add(cached_parsetrees, name, program)
+    | None => ()
+    };
+    program;
   };
 };
 
-let scan_for_imports = (~defer_errors=true, filename: string): list(string) => {
+let read_imports = ({Parsetree.comments, Parsetree.statements}) => {
+  let implicit_opens =
+    List.map(
+      o => {
+        switch (o) {
+        | Grain_utils.Config.Pervasives_mod => Location.mknoloc("pervasives")
+        | Grain_utils.Config.Gc_mod => Location.mknoloc("runtime/gc")
+        }
+      },
+      switch (comments) {
+      | [Block({cmt_content}), ..._] =>
+        Grain_utils.Config.with_inline_flags(
+          ~on_error=_ => (),
+          cmt_content,
+          Grain_utils.Config.get_implicit_opens,
+        )
+      | _ => Grain_utils.Config.get_implicit_opens()
+      },
+    );
+  let found_imports = ref([]);
+  let iter_mod = (self, import) =>
+    found_imports := [import.Parsetree.pimp_path, ...found_imports^];
+  let iterator = {...Ast_iterator.default_iterator, import: iter_mod};
+  List.iter(iterator.toplevel(iterator), statements);
+
+  List.sort_uniq(
+    (a, b) => String.compare(a.txt, b.txt),
+    List.append(implicit_opens, found_imports^),
+  );
+};
+
+let scan_for_imports =
+    (~defer_errors=true, filename: string): list(loc(string)) => {
   let ic = open_in(filename);
   let lexbuf = Sedlexing.Utf8.from_channel(ic);
   try({
@@ -136,36 +188,9 @@ let scan_for_imports = (~defer_errors=true, filename: string): list(string) => {
       close_in(ic);
       source;
     };
-    let {Parsetree.comments, Parsetree.statements} =
-      parse(~name=filename, lexbuf, source);
-    let implicit_opens =
-      List.map(
-        o => {
-          switch (o) {
-          | Grain_utils.Config.Pervasives_mod => "pervasives"
-          | Grain_utils.Config.Gc_mod => "runtime/gc"
-          }
-        },
-        switch (comments) {
-        | [Block({cmt_content}), ..._] =>
-          Grain_utils.Config.with_inline_flags(
-            ~on_error=_ => (),
-            cmt_content,
-            Grain_utils.Config.get_implicit_opens,
-          )
-        | _ => Grain_utils.Config.get_implicit_opens()
-        },
-      );
-    let found_imports = ref([]);
-    let iter_mod = (self, import) =>
-      found_imports := [import.Parsetree.pimp_path.txt, ...found_imports^];
-    let iterator = {...Ast_iterator.default_iterator, import: iter_mod};
-    List.iter(iterator.toplevel(iterator), statements);
+    let prog = parse(~name=filename, lexbuf, source);
     close_in(ic);
-    List.sort_uniq(
-      String.compare,
-      List.append(implicit_opens, found_imports^),
-    );
+    read_imports(prog);
   }) {
   | e =>
     close_in(ic);

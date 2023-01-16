@@ -214,8 +214,9 @@ module MakeMap =
           map_expression(a2),
           map_expression(a3),
         )
-      | TExpRecord(args) =>
+      | TExpRecord(b, args) =>
         TExpRecord(
+          Option.map(map_expression, b),
           Array.map(
             fun
             | (desc, Overridden(name, expr)) => (
@@ -250,6 +251,7 @@ module MakeMap =
         )
       | TExpContinue => TExpContinue
       | TExpBreak => TExpBreak
+      | TExpReturn(e) => TExpReturn(Option.map(map_expression, e))
       };
     Map.leave_expression({...exp, exp_extra, exp_desc});
   };

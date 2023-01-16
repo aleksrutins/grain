@@ -7,6 +7,7 @@
  */
 
 import List from "list"
+import Array from "array"
 
 // implementation based on immutable skew binomial queue with global root optimization
 // as described in the paper "Optimal Purely Functional Priority Queues" by Chris Okasaki.
@@ -40,18 +41,28 @@ record ImmutablePriorityQueue<a> {
 }
 
 /**
- * @section Values: Functions for working with ImmutablePriorityQueues.
+ * @section Values: Functions and constants for working with ImmutablePriorityQueues.
  */
+
+/**
+ * An empty priority queue with the default `compare` comparator.
+ *
+ * @since v0.5.4
+ */
+export let empty = {
+  let empty = { comp: compare, size: 0, root: None }
+  empty
+}
 
 /**
  * Creates a new priority queue with a comparator function, which is used to
  * determine priority of elements. The comparator function takes two elements
  * and must return 0 if both share priority, a positive number if the first
  * has greater priority, and a negative number if the first has less priority.
- * 
+ *
  * @param comp: The comparator function used to indicate priority order
  * @returns An empty priority queue
- * 
+ *
  * @example ImmutablePriorityQueue.make(compare) // creates a min priority queue of numbers using the compare pervasive
  * @example ImmutablePriorityQueue.make((a, b) => String.length(b) - String.length(a)) // creates a priority queue by string length (longest to shortest)
  *
@@ -63,7 +74,7 @@ export let make = comp => {
 
 /**
  * Gets the number of elements in a priority queue.
- * 
+ *
  * @param pq: The priority queue to inspect
  * @returns The number of elements in the priority queue
  *
@@ -75,7 +86,7 @@ export let size = pq => {
 
 /**
  * Determines if the priority queue contains no elements.
- * 
+ *
  * @param pq: The priority queue to check
  * @returns `true` if the priority queue is empty and `false` otherwise
  *
@@ -120,7 +131,7 @@ let skewInsert = (comp, val, pq) => {
 
 /**
  * Produces a new priority queue by inserting the given element into the given priority queue.
- * 
+ *
  * @param val: The value to add into the priority queue
  * @param pq: The priority queue
  * @returns A new priority queue with the given element inserted
@@ -131,8 +142,8 @@ export let push = (val, pq) => {
     None => { comp, size: 1, root: Some({ rootVal: val, pq: [] }) },
     Some({ rootVal, pq }) => {
       // make the new value the root if it has higher priority than the highest priority value
-      let (morePriorityVal, lessPriorityVal) = if (comp(val, rootVal) <= 0)
-          (val, rootVal) else (rootVal, val)
+      let (morePriorityVal, lessPriorityVal) =
+        if (comp(val, rootVal) <= 0) (val, rootVal) else (rootVal, val)
 
       let newRoot = Some(
         { rootVal: morePriorityVal, pq: skewInsert(comp, lessPriorityVal, pq) }
@@ -145,7 +156,7 @@ export let push = (val, pq) => {
 /**
  * Retrieves the highest priority element in the priority queue. It is not
  * removed from the queue.
- * 
+ *
  * @param pq: The priority queue to inspect
  * @returns `Some(value)` containing the highest priority element or `None` if the priority queue is empty
  *
@@ -161,8 +172,8 @@ export let peek = pq => {
 let linkNodes = (comp, node1, node2) => {
   // make the node with higher priority the parent of the node with smaller
   // priority to presere heap-ordering
-  let (morePriority, lessPriority) = if (comp(node1.val, node2.val) <= 0)
-      (node1, node2) else (node2, node1)
+  let (morePriority, lessPriority) =
+    if (comp(node1.val, node2.val) <= 0) (node1, node2) else (node2, node1)
   {
     val: morePriority.val,
     rank: morePriority.rank + 1,
@@ -216,7 +227,7 @@ let merge = (comp, pq1, pq2) =>
 let rec separateHighestPriority = (comp, pq) => {
   match (pq) {
     // empty list case should never happen; this is here just to satisfy the compiler
-    [] => fail "getHighestPriority called with empty PQ",
+    [] => fail "Impossible: getHighestPriority called with empty PQ",
     [node] => (node, []),
     [node, ...rest] => {
       let (currMinNode, currNonMinNodes) = separateHighestPriority(comp, rest)
@@ -256,7 +267,7 @@ let withoutHighestPriority = (comp, pq) => {
 let rec findHighestPriority = (comp, pq) => {
   match (pq) {
     // empty list case should never happen; this is here just to satisfy the compiler
-    [] => fail "findHighestPriority with empty PQ",
+    [] => fail "Impossible: findHighestPriority with empty PQ",
     [node] => node.val,
     [node, ...rest] => {
       let currMin = findHighestPriority(comp, rest)
@@ -269,7 +280,7 @@ let rec findHighestPriority = (comp, pq) => {
  * Produces a new priority queue without the highest priority element in the
  * given priority queue. If the input priority queue is empty, this function will
  * return it.
- * 
+ *
  * @param pq: The priority queue
  * @returns A new priority queue without the highest priority element
  *
@@ -298,7 +309,7 @@ export let pop = pq => {
 
 /**
  * Produces a list of all elements in the priority queue in priority order.
- * 
+ *
  * @param pq: The priority queue to drain
  * @returns A list of all elements in the priority in priority order
  *
@@ -320,7 +331,7 @@ export let drain = pq => {
  * elements. The comparator function takes two elements and must return 0 if
  * both share priority, a positive number if the first has greater priority,
  * and a negative number if the first has less priority.
- * 
+ *
  * @param list: A list of values used to initialize the priority queue
  * @param comp: A comparator function used to assign priority to elements
  * @returns A priority queue containing the elements from the list
@@ -329,4 +340,21 @@ export let drain = pq => {
  */
 export let fromList = (list, comp) => {
   List.reduce((pq, val) => push(val, pq), make(comp), list)
+}
+
+/**
+ * Constructs a new priority queue initialized with the elements in the array
+ * using a custom comparator function, which is used to determine priority of
+ * elements. The comparator function takes two elements and must return 0 if
+ * both share priority, a positive number if the first has greater priority,
+ * and a negative number if the first has less priority.
+ *
+ * @param array: An array of values used to initialize the priority queue
+ * @param comp: A comparator function used to assign priority to elements
+ * @returns A priority queue containing the elements from the array
+ *
+ * @since v0.5.4
+ */
+export let fromArray = (array, comp) => {
+  Array.reduce((pq, val) => push(val, pq), make(comp), array)
 }

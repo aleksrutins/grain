@@ -176,7 +176,8 @@ type prim0 =
     | AllocateInt64
     | AllocateFloat32
     | AllocateFloat64
-    | AllocateRational;
+    | AllocateRational
+    | Unreachable;
 
 type prim1 =
   Parsetree.prim1 =
@@ -189,6 +190,7 @@ type prim1 =
     | NewInt64
     | NewFloat32
     | NewFloat64
+    | BuiltinId
     | LoadAdtVariant
     | StringSize
     | BytesSize
@@ -313,7 +315,7 @@ type allocation_type =
   | MTuple(list(immediate))
   | MBox(immediate)
   | MArray(list(immediate))
-  | MRecord(immediate, list((string, immediate)))
+  | MRecord(immediate, list((option(string), immediate)))
   | MADT(immediate, immediate, list(immediate)) /* Type Tag, Variant Tag, Elements */
   | MBytes(bytes)
   | MString(string)
@@ -424,6 +426,7 @@ and instr_desc =
   | MFor(option(block), option(block), block)
   | MContinue
   | MBreak
+  | MReturn(option(instr))
   | MSwitch(immediate, list((int32, block)), block, Types.allocation_type) /* value, branches, default, return type */
   | MPrim0(prim0)
   | MPrim1(prim1, immediate)

@@ -180,7 +180,8 @@ type prim0 =
     | AllocateInt64
     | AllocateFloat32
     | AllocateFloat64
-    | AllocateRational;
+    | AllocateRational
+    | Unreachable;
 
 type prim1 =
   Parsetree.prim1 =
@@ -193,6 +194,7 @@ type prim1 =
     | NewInt64
     | NewFloat32
     | NewFloat64
+    | BuiltinId
     | LoadAdtVariant
     | StringSize
     | BytesSize
@@ -411,7 +413,10 @@ and expression_desc =
   | TExpArray(list(expression))
   | TExpArrayGet(expression, expression)
   | TExpArraySet(expression, expression, expression)
-  | TExpRecord(array((Types.label_description, record_label_definition)))
+  | TExpRecord(
+      option(expression),
+      array((Types.label_description, record_label_definition)),
+    )
   | TExpRecordGet(expression, loc(Identifier.t), Types.label_description)
   | TExpRecordSet(
       expression,
@@ -437,6 +442,7 @@ and expression_desc =
     )
   | TExpContinue
   | TExpBreak
+  | TExpReturn(option(expression))
   | TExpLambda(list(match_branch), partial)
   | TExpApp(expression, list(expression))
   | TExpConstruct(
@@ -448,7 +454,7 @@ and expression_desc =
   | TExpNull
 
 and record_label_definition =
-  | Kept(Types.type_expr)
+  | Kept
   | Overridden(loc(Identifier.t), expression)
 
 and value_binding = {

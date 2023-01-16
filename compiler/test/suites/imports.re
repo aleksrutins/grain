@@ -9,6 +9,7 @@ describe("imports", ({test, testSkip}) => {
   let assertCompileError = makeCompileErrorRunner(test);
   let assertRun = makeRunner(test_or_skip);
   let assertFileRun = makeFileRunner(test_or_skip);
+  let assertFileCompileError = makeFileCompileErrorRunner(test_or_skip);
   let assertFileSnapshot = makeSnapshotFileRunner(test);
 
   /* import * tests */
@@ -61,7 +62,7 @@ describe("imports", ({test, testSkip}) => {
   assertCompileError(
     "import_all_except_error_constructor",
     "import * except {Cons} from \"tlists\"; Cons(2, Empty)",
-    "Unbound value Cons",
+    "Unbound constructor Cons",
   );
   assertCompileError(
     "import_all_except_multiple_error_constructor",
@@ -71,7 +72,7 @@ describe("imports", ({test, testSkip}) => {
   assertCompileError(
     "import_all_except_multiple_error2_constructor",
     "import * except {Cons, append} from \"tlists\"; let x = Cons(2, Empty); append(x, Empty)",
-    "Unbound value Cons",
+    "Unbound constructor Cons",
   );
   /* import {} tests */
   assertSnapshot("import_some", "import {x} from \"exportStar\"; x");
@@ -212,4 +213,9 @@ describe("imports", ({test, testSkip}) => {
     "import TList, { Empty } from \"tlists\"; let foo : TList.TList<String> = Empty; foo",
   );
   assertFileRun("relative_import_linking", "relativeImportLinking", "2\n2\n");
+  assertFileCompileError(
+    "import_broken",
+    "brokenImports/main",
+    "./broken.gr\", line 2, characters 16-23",
+  );
 });

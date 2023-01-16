@@ -168,7 +168,7 @@ module Comp: {
       ~attributes: attributes=?,
       ~env: env=?,
       imm_expression,
-      list((str, imm_expression))
+      list((option(str), imm_expression))
     ) =>
     comp_expression;
   let adt:
@@ -262,6 +262,14 @@ module Comp: {
     comp_expression;
   let break:
     (~loc: loc=?, ~attributes: attributes=?, ~env: env=?, unit) =>
+    comp_expression;
+  let return:
+    (
+      ~loc: loc=?,
+      ~attributes: attributes=?,
+      ~env: env=?,
+      option(comp_expression)
+    ) =>
     comp_expression;
   let switch_:
     (

@@ -63,6 +63,7 @@ let prim_map =
       ("@new.int64", Primitive1(NewInt64)),
       ("@new.float32", Primitive1(NewFloat32)),
       ("@new.float64", Primitive1(NewFloat64)),
+      ("@builtin.id", Primitive1(BuiltinId)),
       ("@adt.load_variant", Primitive1(LoadAdtVariant)),
       ("@string.size", Primitive1(StringSize)),
       ("@bytes.size", Primitive1(BytesSize)),
@@ -76,6 +77,7 @@ let prim_map =
       ("@ignore", Primitive1(Ignore)),
       ("@assert", Primitive1(Assert)),
       ("@throw", Primitive1(Throw)),
+      ("@unreachable", Primitive0(Unreachable)),
       ("@is", Primitive2(Is)),
       ("@eq", Primitive2(Eq)),
       ("@and", Primitive2(And)),
@@ -1507,7 +1509,8 @@ let transl_prim = (env, desc) => {
     | Primitive0(
         (
           AllocateInt32 | AllocateInt64 | AllocateFloat32 | AllocateFloat64 |
-          AllocateRational
+          AllocateRational |
+          Unreachable
         ) as p,
       ) => (
         Exp.lambda(~loc, ~attributes=disable_gc, [], Exp.prim0(~loc, p)),
@@ -1529,6 +1532,9 @@ let transl_prim = (env, desc) => {
         ),
         [],
       )
+    | Primitive1(BuiltinId) =>
+      // This primitive must always be inlined, so we do not generate a lambda
+      (Exp.constant(PConstVoid), [])
     | Primitive1(p) => (
         Exp.lambda(~loc, [pat_a], Exp.prim1(~loc, p, id_a)),
         [],

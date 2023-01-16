@@ -674,7 +674,6 @@ insert : (a, Number, List<a>) -> List<a>
 ```
 
 Inserts a new value into a list at the specified index.
-Fails if the index is out-of-bounds.
 
 Parameters:
 
@@ -689,6 +688,13 @@ Returns:
 |type|description|
 |----|-----------|
 |`List<a>`|The new list|
+
+Throws:
+
+`Failure(String)`
+
+* When `index` is negative
+* When `index` is more than 0 and greater than the list size
 
 ### List.**count**
 
@@ -735,7 +741,6 @@ part : (Number, List<a>) -> (List<a>, List<a>)
 ```
 
 Split a list into two, with the first list containing the required number of elements.
-Fails if the input list doesn't contain at least the required amount of elements.
 
 Parameters:
 
@@ -750,29 +755,42 @@ Returns:
 |----|-----------|
 |`(List<a>, List<a>)`|Two lists where the first contains exactly the required amount of elements and the second contains any remaining elements|
 
+Throws:
+
+`Failure(String)`
+
+* When `count` is negative
+* When the list doesn't contain at least the required amount of elements
+
 ### List.**rotate**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.1.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.1.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>next</code></td><td>No longer throws if `count` outside list length bounds</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
 rotate : (Number, List<a>) -> List<a>
 ```
 
-Rotates list elements by the specified amount to the left.
+Rotates list elements by the specified amount to the left, such that `n`th
+element is the first in the new list.
 
 If value is negative, list elements will be rotated by the
 specified amount to the right. See examples.
-
-Fails if the input list doesn't contain at least the required amount of elements.
 
 Parameters:
 
 |param|type|description|
 |-----|----|-----------|
-|`count`|`Number`|The number of elements to rotate by|
+|`n`|`Number`|The number of elements to rotate by|
 |`list`|`List<a>`|The list to be rotated|
 
 Examples:
@@ -783,6 +801,10 @@ List.rotate(2, [1, 2, 3, 4, 5]) // [3, 4, 5, 1, 2]
 
 ```grain
 List.rotate(-1, [1, 2, 3, 4, 5]) // [5, 1, 2, 3, 4]
+```
+
+```grain
+List.rotate(-7, [1, 2, 3, 4, 5]) // [4, 5, 1, 2, 3]
 ```
 
 ### List.**unique**
@@ -943,8 +965,6 @@ drop : (Number, List<a>) -> List<a>
 Produces a new list with the specified number of elements removed from
 the beginning of the input list.
 
-Fails if the specified amount is a negative number.
-
 Parameters:
 
 |param|type|description|
@@ -957,6 +977,12 @@ Returns:
 |type|description|
 |----|-----------|
 |`List<a>`|The new list without the dropped elements|
+
+Throws:
+
+`Failure(String)`
+
+* When `count` is negative
 
 ### List.**dropWhile**
 
@@ -1000,8 +1026,6 @@ take : (Number, List<a>) -> List<a>
 Produces a new list with–at most—the specified amount elements from
 the beginning of the input list.
 
-Fails if the specified amount is a negative number.
-
 Parameters:
 
 |param|type|description|
@@ -1014,6 +1038,12 @@ Returns:
 |type|description|
 |----|-----------|
 |`List<a>`|The new list containing the taken elements|
+
+Throws:
+
+`Failure(String)`
+
+* When `count` is negative
 
 ### List.**takeWhile**
 
@@ -1152,8 +1182,6 @@ sub : (Number, Number, List<a>) -> List<a>
 Provides the subset of a list given zero-based start index and amount of elements
 to include.
 
-Fails if the start index or amount of elements are negative numbers.
-
 Parameters:
 
 |param|type|description|
@@ -1167,6 +1195,13 @@ Returns:
 |type|description|
 |----|-----------|
 |`List<a>`|The subset of the list|
+
+Throws:
+
+`Failure(String)`
+
+* When `start` is negative
+* When `length` is negative
 
 ### List.**join**
 

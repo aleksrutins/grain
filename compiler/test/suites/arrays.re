@@ -20,6 +20,7 @@ describe("arrays", ({test, testSkip}) => {
   assertSnapshot("array_access3", "let x = [> 1, 2, 3]; x[2]");
   assertSnapshot("array_access4", "let x = [> 1, 2, 3]; x[-2]");
   assertSnapshot("array_access5", "let x = [> 1, 2, 3]; x[-3]");
+  assertSnapshot("array_access5", "[> 1, 2, 3][-3]");
   assertRunError(
     "array_access_err",
     "let x = [> 1, 2, 3]; x[3]",
@@ -40,8 +41,23 @@ describe("arrays", ({test, testSkip}) => {
     "let x = [> 1, 2, 3]; x[-99]",
     "Index out of bounds",
   );
-  assertCompileError(
+  assertRunError(
     "array_access_err5",
+    "let x = [> 1, 2, 3]; x[1.5]",
+    "Index not an integer",
+  );
+  assertRunError(
+    "array_access_err6",
+    "let x = [> 1, 2, 3]; x[1/3]",
+    "Index not an integer",
+  );
+  assertRunError(
+    "array_access_err7",
+    "let x = [> 1, 2, 3]; x[987654321987654321]",
+    "Index out of bounds",
+  );
+  assertCompileError(
+    "array_access_err8",
     "let x = [> 1, 2, 3]; x[false]",
     "has type Bool but",
   );
@@ -63,6 +79,21 @@ describe("arrays", ({test, testSkip}) => {
   assertRunError(
     "array_set_err2",
     "let x = [> 1, 2, 3]; x[-12] = 4",
+    "Index out of bounds",
+  );
+  assertRunError(
+    "array_set_err3",
+    "let x = [> 1, 2, 3]; x[1.5] = 4",
+    "Index not an integer",
+  );
+  assertRunError(
+    "array_set_err4",
+    "let x = [> 1, 2, 3]; x[1/3] = 4",
+    "Index not an integer",
+  );
+  assertRunError(
+    "array_set_err5",
+    "let x = [> 1, 2, 3]; x[987654321987654321] = 4",
     "Index out of bounds",
   );
   assertCompileError(

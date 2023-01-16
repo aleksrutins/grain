@@ -162,7 +162,8 @@ type prim0 =
     | AllocateInt64
     | AllocateFloat32
     | AllocateFloat64
-    | AllocateRational;
+    | AllocateRational
+    | Unreachable;
 
 type prim1 =
   Parsetree.prim1 =
@@ -175,6 +176,7 @@ type prim1 =
     | NewInt64
     | NewFloat32
     | NewFloat64
+    | BuiltinId
     | LoadAdtVariant
     | StringSize
     | BytesSize
@@ -327,7 +329,7 @@ and comp_expression_desc =
   | CArray(list(imm_expression))
   | CArrayGet(imm_expression, imm_expression)
   | CArraySet(imm_expression, imm_expression, imm_expression)
-  | CRecord(imm_expression, list((loc(string), imm_expression)))
+  | CRecord(imm_expression, list((option(loc(string)), imm_expression)))
   | CAdt(imm_expression, imm_expression, list(imm_expression))
   | CGetTupleItem(int32, imm_expression)
   | CSetTupleItem(int32, imm_expression, imm_expression)
@@ -339,6 +341,7 @@ and comp_expression_desc =
   | CFor(option(anf_expression), option(anf_expression), anf_expression)
   | CContinue
   | CBreak
+  | CReturn(option(comp_expression))
   | CSwitch(imm_expression, list((int, anf_expression)), partial)
   | CApp(
       (imm_expression, (list(allocation_type), allocation_type)),

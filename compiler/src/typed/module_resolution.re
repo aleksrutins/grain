@@ -4,7 +4,7 @@ open Cmi_format;
 
 type error =
   | Missing_module(Location.t, Path.t, Path.t)
-  | No_module_file(string, option(string));
+  | No_module_file(Location.t, string, option(string));
 
 exception Error(error);
 
@@ -280,16 +280,32 @@ module Dependency_graph =
         let from_srcpath = srcpath => {
           List.map(
             name => {
-              let located = locate_module(base_dir, active_search_path, name);
+              let located =
+                try(
+                  locate_module(
+                    base_dir,
+                    active_search_path,
+                    name.Location.txt,
+                  )
+                ) {
+                | Not_found =>
+                  error(
+                    No_module_file(
+                      name.Location.loc,
+                      name.Location.txt,
+                      None,
+                    ),
+                  )
+                };
               let out_file_name = located_to_out_file_name(located);
               let existing_dependency = lookup(out_file_name);
               switch (existing_dependency) {
               | Some(ed) =>
-                Hashtbl.add(ed.dn_unit_name, Some(dn), name);
+                Hashtbl.add(ed.dn_unit_name, Some(dn), name.Location.txt);
                 ed;
               | None =>
                 let tbl = Hashtbl.create(8);
-                Hashtbl.add(tbl, Some(dn), name);
+                Hashtbl.add(tbl, Some(dn), name.Location.txt);
                 {
                   dn_unit_name: tbl,
                   dn_file_name: out_file_name,
@@ -315,7 +331,16 @@ module Dependency_graph =
             List.map(
               ((name, _)) => {
                 let located =
-                  locate_module(base_dir, active_search_path, name);
+                  try(locate_module(base_dir, active_search_path, name)) {
+                  | Not_found =>
+                    error(
+                      No_module_file(
+                        Location.in_file(dn.dn_file_name),
+                        name,
+                        None,
+                      ),
+                    )
+                  };
                 let out_file_name = located_to_out_file_name(located);
                 let existing_dependency = lookup(out_file_name);
                 switch (existing_dependency) {
@@ -429,17 +454,24 @@ module Dependency_graph =
   });
 
 let locate_module_file = (~loc, ~disable_relpath=false, unit_name) => {
-  /* NOTE: We need to take care here to *not* wrap get_up_to_date with this try/with, since
-     it will falsely raise No_module_file if a Not_found is raised during the compilation */
   let base_dir = Filepath.String.dirname(current_filename^());
   let path = Config.module_search_path();
   let located =
     try(locate_module(~disable_relpath, base_dir, path, unit_name)) {
-    | Not_found => error(No_module_file(unit_name, None))
+    | Not_found => error(No_module_file(loc, unit_name, None))
+    };
+  located_to_out_file_name(located);
+};
+
+let process_dependency = (~loc, ~base_file, unit_name) => {
+  let base_dir = Filepath.String.dirname(base_file);
+  let path = Config.module_search_path();
+  let located =
+    try(locate_module(~disable_relpath=false, base_dir, path, unit_name)) {
+    | Not_found => error(No_module_file(loc, unit_name, None))
     };
   let out_file = located_to_out_file_name(located);
-  let current_dep_node =
-    Dependency_graph.lookup_filename(current_filename^());
+  let current_dep_node = Dependency_graph.lookup_filename(base_file);
   let existing_dependency = Dependency_graph.lookup_filename(out_file);
   let dn =
     switch (existing_dependency) {
@@ -457,13 +489,24 @@ let locate_module_file = (~loc, ~disable_relpath=false, unit_name) => {
       };
     };
   Dependency_graph.register(dn);
-  Dependency_graph.compile_dependencies(~loc, out_file);
-  let ret = located_to_out_file_name(located);
-  ret;
+};
+
+let compile_dependency_graph = (~base_file, dependencies) => {
+  open Location;
+  List.iter(
+    ({txt: dependency, loc}) =>
+      process_dependency(~loc, ~base_file, dependency),
+    dependencies,
+  );
+  Dependency_graph.compile_graph();
 };
 
 let clear_dependency_graph = () => {
   Dependency_graph.clear();
+};
+
+let get_dependencies = () => {
+  Dependency_graph.get_dependencies();
 };
 
 let () = {
@@ -509,14 +552,16 @@ let report_error = ppf =>
         "was not found",
       );
     }
-  | No_module_file(m, None) => fprintf(ppf, "Missing file for module %s", m)
-  | No_module_file(m, Some(msg)) =>
+  | No_module_file(_, m, None) =>
+    fprintf(ppf, "Missing file for module %s", m)
+  | No_module_file(_, m, Some(msg)) =>
     fprintf(ppf, "Missing file for module %s: %s", m, msg);
 
 let () =
   Location.register_error_of_exn(
     fun
-    | Error(Missing_module(loc, _, _) as err) when loc != Location.dummy_loc =>
+    | Error(Missing_module(loc, _, _) as err)
+    | Error(No_module_file(loc, _, _) as err) when loc != Location.dummy_loc =>
       Some(Location.error_of_printer(loc, report_error, err))
     | Error(err) => Some(Location.error_of_printer_file(report_error, err))
     | _ => None,

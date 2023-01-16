@@ -26,11 +26,12 @@ let symbol_table = ref(Ident.empty: Ident.tbl(Ident.tbl(Ident.t)));
 let type_map = Path_tbl.create(10);
 let import_map = Path_tbl.create(10);
 
-let get_type_id = typath =>
+let get_type_id = (typath, env) =>
   switch (Path_tbl.find_opt(type_map, typath)) {
   | Some(id) => id
   | None =>
-    let id = Path.stamp(typath);
+    let type_declaration = Env.find_type(typath, env);
+    let id = Path.stamp(type_declaration.type_path);
     Path_tbl.add(type_map, typath, id);
     id;
   };
@@ -324,20 +325,26 @@ let rec transl_imm =
       Imm.id(~loc, ~env, tmp),
       [BLet(tmp, Comp.prim0(~loc, ~env, ~allocation_type, op), Nonglobal)],
     );
+  | TExpPrim1(BuiltinId, arg) =>
+    switch (arg.exp_desc) {
+    | TExpConstant(Const_string(builtin)) =>
+      switch (Hashtbl.find_opt(Builtin_types.builtin_idents, builtin)) {
+      | Some(id) => (
+          Imm.const(
+            ~loc,
+            ~env,
+            Const_number(Const_number_int(Int64.of_int(id.stamp))),
+          ),
+          [],
+        )
+      | None => failwith(Printf.sprintf("Unknown builtin `%s`", builtin))
+      }
+    | _ => failwith("Builtin must be a string literal")
+    }
   | TExpPrim1(op, arg) =>
     let tmp = gensym("unary");
-    let (arg_imm, arg_setup) = transl_imm(arg);
-    (
-      Imm.id(~loc, ~env, tmp),
-      arg_setup
-      @ [
-        BLet(
-          tmp,
-          Comp.prim1(~loc, ~env, ~allocation_type, op, arg_imm),
-          Nonglobal,
-        ),
-      ],
-    );
+    let (comp, comp_setup) = transl_comp_expression(e);
+    (Imm.id(~loc, ~env, tmp), comp_setup @ [BLet(tmp, comp, Nonglobal)]);
   | TExpPrim2(And, left, right) =>
     let tmp = gensym("boolBinop");
     let (left_imm, left_setup) = transl_imm(left);
@@ -546,6 +553,18 @@ let rec transl_imm =
       Imm.const(Const_void),
       [BSeq(Comp.break(~loc, ~env, ()))],
     )
+  | TExpReturn(value) =>
+    let (value_comp, value_setup) =
+      switch (value) {
+      | Some(value) =>
+        let (value_comp, value_setup) = transl_comp_expression(value);
+        (Some(value_comp), value_setup);
+      | None => (None, [])
+      };
+    (
+      Imm.const(Const_void),
+      value_setup @ [BSeq(Comp.return(~loc, ~env, value_comp))],
+    );
   | TExpApp(
       {exp_desc: TExpIdent(_, _, {val_kind: TValPrim("@throw")})},
       _,
@@ -757,35 +776,56 @@ let rec transl_imm =
         ),
       ],
     );
-  | TExpRecord(args) =>
+  | TExpRecord(base, args) =>
+    let base_imm = Option.map(transl_imm, base);
     let tmp = gensym("record");
-    let definitions =
-      Array.to_list @@ Array.map(((desc, def)) => def, args);
-    let definitions =
-      List.map(
-        fun
-        | Kept(_) => assert(false)
-        | Overridden(name, def) => (name, def),
-        definitions,
-      );
     let (new_args, new_setup) =
       List.split(
         List.map(
-          (({txt: name, loc}, expr)) => {
-            let (var, setup) = transl_imm(expr);
-            (
-              (Location.mkloc(Identifier.string_of_ident(name), loc), var),
-              setup,
-            );
-          },
-          definitions,
+          arg =>
+            switch (arg) {
+            | (ld, Kept) =>
+              let (base_var, _) = Option.get(base_imm);
+              let fieldtmp = gensym("field");
+              (
+                (None, Imm.id(~loc, ~env, fieldtmp)),
+                [
+                  BLet(
+                    fieldtmp,
+                    Comp.record_get(
+                      ~loc,
+                      ~env,
+                      ~allocation_type,
+                      Int32.of_int(ld.lbl_pos),
+                      base_var,
+                    ),
+                    Nonglobal,
+                  ),
+                ],
+              );
+            | (_, Overridden({txt: name, loc}, expr)) =>
+              let (var, setup) = transl_imm(expr);
+              (
+                (
+                  Some(
+                    Location.mkloc(Identifier.string_of_ident(name), loc),
+                  ),
+                  var,
+                ),
+                setup,
+              );
+            },
+          Array.to_list(args),
         ),
       );
     let (typath, _, _) = Typepat.extract_concrete_record(env, typ);
-    let ty_id = get_type_id(typath);
+    let ty_id = get_type_id(typath, env);
     (
       Imm.id(~loc, ~env, tmp),
-      List.concat(new_setup)
+      List.concat(
+        Option.to_list(Option.map(((_, setup)) => setup, base_imm))
+        @ new_setup,
+      )
       @ [
         BLet(
           tmp,
@@ -860,7 +900,29 @@ let rec transl_imm =
       Imm.id(~loc, ~env, tmp),
       (exp_setup @ setup) @ [BLet(tmp, ans, Nonglobal)],
     );
-  | TExpConstruct(_) => failwith("NYI: transl_imm: Construct")
+  | TExpConstruct(_, {cstr_tag}, args) =>
+    let tmp = gensym("adt");
+    let (_, typath, _) = Ctype.extract_concrete_typedecl(env, typ);
+    let ty_id = get_type_id(typath, env);
+    let compiled_tag = compile_constructor_tag(cstr_tag);
+    let (new_args, new_setup) = List.split(List.map(transl_imm, args));
+    let imm_tytag =
+      Imm.const(
+        ~loc,
+        ~env,
+        Const_number(Const_number_int(Int64.of_int(ty_id))),
+      );
+    let imm_tag =
+      Imm.const(
+        ~loc,
+        ~env,
+        Const_number(Const_number_int(Int64.of_int(compiled_tag))),
+      );
+    let adt = Comp.adt(~loc, ~env, imm_tytag, imm_tag, new_args);
+    (
+      Imm.id(~loc, ~env, tmp),
+      List.concat(new_setup) @ [BLet(tmp, adt, Nonglobal)],
+    );
   };
 }
 
@@ -883,6 +945,82 @@ and transl_comp_expression =
       Comp.prim0(~loc, ~attributes, ~allocation_type, ~env, op),
       [],
     )
+  | TExpPrim1(BuiltinId, arg) =>
+    switch (arg.exp_desc) {
+    | TExpConstant(Const_string(builtin)) =>
+      switch (Hashtbl.find_opt(Builtin_types.builtin_idents, builtin)) {
+      | Some(id) => (
+          Comp.imm(
+            ~allocation_type,
+            Imm.const(
+              ~loc,
+              ~env,
+              Const_number(Const_number_int(Int64.of_int(id.stamp))),
+            ),
+          ),
+          [],
+        )
+      | None => failwith(Printf.sprintf("Unknown builtin `%s`", builtin))
+      }
+    | _ => failwith("Builtin must be a string literal")
+    }
+  | TExpPrim1(Assert, arg) =>
+    let (arg_imm, arg_setup) = transl_imm(arg);
+    let assertion_error =
+      Env.find_constructor(PIdent(Builtin_types.ident_assertion_error), env);
+    let assertion_error_identifier =
+      Location.mkloc(
+        Identifier.IdentName(
+          Location.mkloc(assertion_error.cstr_name, assertion_error.cstr_loc),
+        ),
+        assertion_error.cstr_loc,
+      );
+    let mkexp = exp_desc => {...e, exp_desc};
+    let error_message =
+      mkexp(
+        TExpConstant(
+          Const_string(
+            Printf.sprintf(
+              "AssertionError: Assertion failed in %s, line %d",
+              loc.loc_start.pos_fname,
+              loc.loc_start.pos_lnum,
+            ),
+          ),
+        ),
+      );
+    let throw_error =
+      transl_anf_expression(
+        mkexp(
+          TExpPrim1(
+            Throw,
+            {
+              ...e,
+              exp_desc:
+                TExpConstruct(
+                  assertion_error_identifier,
+                  assertion_error,
+                  [error_message],
+                ),
+            },
+          ),
+        ),
+      );
+    (
+      Comp.if_(
+        ~loc,
+        ~env,
+        ~allocation_type,
+        arg_imm,
+        AExp.comp(
+          Comp.imm(
+            ~allocation_type=Unmanaged(WasmI32),
+            Imm.const(Const_void),
+          ),
+        ),
+        throw_error,
+      ),
+      arg_setup,
+    );
   | TExpPrim1(op, arg) =>
     let (arg_imm, arg_setup) = transl_imm(arg);
     (
@@ -955,12 +1093,19 @@ and transl_comp_expression =
       cond_setup,
     );
   | TExpBlock([]) => (Comp.imm(~allocation_type, Imm.const(Const_void)), [])
-  | TExpBlock([stmt]) => transl_comp_expression(stmt)
-  | TExpBlock([fst, ...rest]) =>
-    let (fst_ans, fst_setup) = transl_comp_expression(fst);
-    let (rest_ans, rest_setup) =
-      transl_comp_expression({...e, exp_desc: TExpBlock(rest)});
-    (rest_ans, fst_setup @ [BSeq(fst_ans)] @ rest_setup);
+  | TExpBlock(stmts) =>
+    let stmts = List.rev_map(transl_comp_expression, stmts);
+    // stmts is non-empty, so this cannot fail
+    let (last_ans, last_setup) = List.hd(stmts);
+    let stmts = List.tl(stmts);
+    let setup =
+      List.concat @@
+      List.fold_left(
+        (acc, (ans, setup)) => {[setup, [BSeq(ans)], ...acc]},
+        [last_setup],
+        stmts,
+      );
+    (last_ans, setup);
   | TExpLet(Nonrecursive, _, []) => (
       Comp.imm(~allocation_type, Imm.const(Const_void)),
       [],
@@ -1252,87 +1397,6 @@ and transl_anf_expression =
   );
 };
 
-let bind_constructor =
-    (env, loc, ty_id, (cd_id, {cstr_name, cstr_tag, cstr_args})) => {
-  let compile_constant_constructor = () => {
-    let compiled_tag = compile_constructor_tag(cstr_tag);
-    Comp.adt(
-      ~loc,
-      ~env,
-      Imm.const(
-        ~loc,
-        ~env,
-        Const_number(Const_number_int(Int64.of_int(ty_id))),
-      ),
-      Imm.const(
-        ~loc,
-        ~env,
-        Const_number(Const_number_int(Int64.of_int(compiled_tag))),
-      ),
-      [],
-    );
-  };
-  let rhs =
-    switch (cstr_tag) {
-    | CstrConstant(_) => compile_constant_constructor()
-    | CstrExtension(_, _, CstrExtensionConstant) =>
-      compile_constant_constructor()
-    | CstrBlock(_)
-    | CstrExtension(_) =>
-      let compiled_tag = compile_constructor_tag(cstr_tag);
-      let args =
-        List.map(
-          ty => (gensym("constr_arg"), get_allocation_type(env, ty)),
-          cstr_args,
-        );
-      let arg_ids = List.map(((a, _)) => Imm.id(~loc, ~env, a), args);
-      let imm_tytag =
-        Imm.const(
-          ~loc,
-          ~env,
-          Const_number(Const_number_int(Int64.of_int(ty_id))),
-        );
-      let imm_tag =
-        Imm.const(
-          ~loc,
-          ~env,
-          Const_number(Const_number_int(Int64.of_int(compiled_tag))),
-        );
-      Comp.lambda(
-        ~loc,
-        ~env,
-        ~name=cstr_name,
-        args,
-        (
-          AExp.comp(
-            ~loc,
-            ~env,
-            Comp.adt(~loc, ~env, imm_tytag, imm_tag, arg_ids),
-          ),
-          Managed,
-        ),
-      );
-    | CstrUnboxed => failwith("NYI: ANF CstrUnboxed")
-    };
-  BLet(cd_id, rhs, Global);
-};
-
-let linearize_decl = (env, loc, typath, decl) => {
-  /* FIXME: [philip] This is kind of hacky...would be better to store this in the Env directly...not to mention,
-     I think this'll be much more fragile than if it were in the static info */
-  let ty_id = get_type_id(typath);
-  let descrs = Datarepr.constructors_of_type(typath, decl);
-  List.map(bind_constructor(env, loc, ty_id), descrs);
-};
-
-let linearize_exception = (env, ext) => {
-  let ty_id = get_type_id(ext.ext_type.ext_type_path);
-  let id = ext.ext_id;
-  let loc = ext.ext_loc;
-  let ext = Datarepr.extension_descr(Path.PIdent(id), ext.ext_type);
-  [bind_constructor(env, loc, ty_id, (id, ext))];
-};
-
 let rec transl_anf_statement =
         (
           {
@@ -1449,27 +1513,8 @@ let rec transl_anf_statement =
     let expr = {...expr, exp_attributes: attributes};
     let (comp, setup) = transl_comp_expression(expr);
     (Some(setup @ [BSeq(comp)]), []);
-  | TTopData(decls) =>
-    open Types;
-    let bindings =
-      List.concat @@
-      List.map(
-        decl =>
-          switch (decl.data_kind) {
-          | TDataVariant(_) =>
-            let typath = Path.PIdent(decl.data_id);
-            linearize_decl(env, loc, typath, decl.data_type);
-          | TDataAbstract
-          | TDataRecord(_) => []
-          },
-        decls,
-      );
-    if (List.length(bindings) > 0) {
-      (Some(bindings), []);
-    } else {
-      (None, []);
-    };
-  | TTopException(ext) => (Some(linearize_exception(env, ext)), [])
+  | TTopData(decls) => (None, [])
+  | TTopException(ext) => (None, [])
   | TTopForeign(desc) =>
     let external_name =
       List.fold_left(
@@ -1548,31 +1593,16 @@ let rec transl_anf_statement =
   | _ => (None, [])
   };
 
-let linearize_builtins = (env, builtins) => {
-  let bindings =
-    List.concat @@
-    List.map(
-      decl =>
-        switch (decl.type_kind) {
-        | TDataVariant(_) when decl.type_allocation == Managed =>
-          linearize_decl(env, Location.dummy_loc, decl.type_path, decl)
-        | _ => []
-        },
-      builtins,
-    );
-  (bindings, []);
-};
-
 let gather_type_metadata = statements => {
   List.fold_left(
-    (metadata, {ttop_desc}) => {
+    (metadata, {ttop_desc, ttop_env}) => {
       switch (ttop_desc) {
       | TTopData(decls) =>
         let info =
           List.filter_map(
             decl => {
-              let typath = Path.PIdent(decl.data_id);
-              let id = get_type_id(typath);
+              let typath = decl.data_type.type_path;
+              let id = get_type_id(typath, ttop_env);
               switch (decl.data_kind) {
               | TDataVariant(cnstrs) =>
                 let descrs =
@@ -1601,7 +1631,7 @@ let gather_type_metadata = statements => {
           );
         List.append(info, metadata);
       | TTopException(ext) =>
-        let ty_id = get_type_id(ext.ext_type.ext_type_path);
+        let ty_id = get_type_id(ext.ext_type.ext_type_path, ttop_env);
         let id = ext.ext_id;
         let cstr = Datarepr.extension_descr(Path.PIdent(id), ext.ext_type);
         [
@@ -1630,7 +1660,6 @@ let transl_anf_module =
   Path_tbl.clear(import_map);
   value_imports := [];
   symbol_table := Ident.empty;
-  let prog_setup = linearize_builtins(env, Builtin_types.builtin_decls);
   let (top_binds, imports) =
     List.fold_left(
       ((acc_bind, acc_imp), cur) =>
@@ -1641,7 +1670,7 @@ let transl_anf_module =
             List.rev_append(lst, acc_imp),
           )
         },
-      prog_setup,
+      ([], []),
       List.map(transl_anf_statement, statements),
     );
   let imports = List.rev(imports);

@@ -89,6 +89,7 @@ describe("stdlib", ({test, testSkip}) => {
     "enterthevoid\n",
   );
   assertStdlib("array.test");
+  assertStdlib("immutablearray.test");
   assertStdlib("bigint.test");
   assertStdlib("bytes.test");
   assertStdlib("buffer.test");
@@ -100,14 +101,17 @@ describe("stdlib", ({test, testSkip}) => {
   assertStdlib("int64.test");
   assertStdlib("list.test");
   assertStdlib("map.test");
+  assertStdlib("immutablemap.test");
   assertStdlib("marshal.test");
   assertStdlib("number.test");
   assertStdlib("option.test");
+  assertStdlib("path.test");
   assertStdlib("pervasives.test");
   assertStdlib("queue.test");
   assertStdlib("range.test");
   assertStdlib("result.test");
   assertStdlib("set.test");
+  assertStdlib("immutableset.test");
   assertStdlib("regex.test");
   assertStdlib("stack.test");
   assertStdlib("priorityqueue.test");

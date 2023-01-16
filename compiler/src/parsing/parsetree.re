@@ -308,7 +308,8 @@ type prim0 =
   | AllocateInt64
   | AllocateFloat32
   | AllocateFloat64
-  | AllocateRational;
+  | AllocateRational
+  | Unreachable;
 
 /** Single-argument operators */
 [@deriving (sexp, yojson)]
@@ -322,6 +323,7 @@ type prim1 =
   | NewInt64
   | NewFloat32
   | NewFloat64
+  | BuiltinId
   | LoadAdtVariant
   | StringSize
   | BytesSize
@@ -434,7 +436,7 @@ and expression_desc =
   | PExpArray(list(expression))
   | PExpArrayGet(expression, expression)
   | PExpArraySet(expression, expression, expression)
-  | PExpRecord(list((loc(Identifier.t), expression)))
+  | PExpRecord(option(expression), list((loc(Identifier.t), expression)))
   | PExpRecordGet(expression, loc(Identifier.t))
   | PExpRecordSet(expression, loc(Identifier.t), expression)
   | PExpLet(rec_flag, mut_flag, list(value_binding))
@@ -453,9 +455,11 @@ and expression_desc =
     )
   | PExpContinue
   | PExpBreak
+  | PExpReturn(option(expression))
   | PExpConstraint(expression, parsed_type)
   | PExpLambda(list(pattern), expression)
   | PExpApp(expression, list(expression))
+  | PExpConstruct(loc(Identifier.t), list(expression))
   | PExpBlock(list(expression))
   | PExpBoxAssign(expression, expression)
   | PExpAssign(expression, expression)

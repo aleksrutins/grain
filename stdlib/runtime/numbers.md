@@ -22,6 +22,12 @@ isInteger : WasmI32 -> Bool
 isRational : WasmI32 -> Bool
 ```
 
+### Numbers.**isNaN**
+
+```grain
+isNaN : WasmI32 -> Bool
+```
+
 ### Numbers.**isNumber**
 
 ```grain
@@ -109,7 +115,7 @@ numberEqual : (WasmI32, WasmI32) -> Bool
 ### Numbers.**cmp**
 
 ```grain
-cmp : (WasmI32, WasmI32, Bool) -> WasmI32
+cmp : (WasmI32, WasmI32) -> WasmI32
 ```
 
 ### Numbers.**(<)**
@@ -321,4 +327,30 @@ decr : Number -> Number
 ```grain
 isBigInt : a -> Bool
 ```
+
+### Numbers.**scalbn**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+scalbn : (WasmF64, WasmI32) -> WasmF64
+```
+
+Multiplies a floating-point number by an integral power of 2.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`x`|`WasmF64`|The floating-point value|
+|`n`|`WasmI32`|The Integer exponent|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`WasmF64`|The result of x * 2^n|
 

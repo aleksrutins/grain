@@ -786,7 +786,7 @@ let _SIZES = [>
 ]
 
 @unsafe
-export let rec bigIntToString = (num: WasmI32, base: WasmI32) => {
+export let bigIntToString = (num: WasmI32, base: WasmI32) => {
   let getDigit = n =>
     WasmI32.load8U(WasmI32.add(WasmI32.fromGrain(_DIGITS), n), 8n)
   if (WasmI32.ltS(base, 2n) || WasmI32.gtS(base, 32n)) {
@@ -1339,7 +1339,7 @@ export let shl = (num: WasmI32, places: WasmI32) => {
   let (&) = WasmI64.and
   let a = places / 32n
   let b = places % 32n
-  let mask = (1N << WasmI64.extendI32U(b)) - 1N << 64N - WasmI64.extendI32U(b)
+  let mask = ((1N << WasmI64.extendI32U(b)) - 1N) << 64N - WasmI64.extendI32U(b)
   let result = init(numLimbs + a)
   setFlag(result, _IS_NEGATIVE, getFlag(num, _IS_NEGATIVE))
   let numHalfLimbs = WasmI32.shl(numLimbs, 1n)
@@ -1350,7 +1350,7 @@ export let shl = (num: WasmI32, places: WasmI32) => {
     setHalfLimb(
       result,
       i + a,
-      WasmI32.wrapI64(acc << WasmI64.extendI32U(b) >> 32N)
+      WasmI32.wrapI64((acc << WasmI64.extendI32U(b)) >> 32N)
     )
   }
   let (>) = WasmI64.gtU
@@ -1827,10 +1827,10 @@ let baseCaseDivRem = (a: WasmI32, b: WasmI32, result: WasmI32) => {
   let n = getHalfSize(b)
   let m = getHalfSize(a) - n
   let qsize = (if (WasmI32.eqz(WasmI32.and(m + 1n, 1n))) {
-        m + 1n
-      } else {
-        m + 2n
-      }) >>
+      m + 1n
+    } else {
+      m + 2n
+    }) >>
     1n
   let mut q = init(qsize)
   let mut a = 0n

@@ -119,7 +119,7 @@ let find_component = (lookup: (~mark: _=?) => _, make_error, env, loc, lid) =>
     }
   ) {
   | Not_found =>
-    /* [FIXME] This should be replaced with a more specific exception, since it can eat errors from compilation of submodules */
+    // TODO(#1506): Replace this with a more specific exception as it can eat errors from compilation of submodules
     narrow_unbound_lid_error(env, loc, lid, make_error)
   };
 
@@ -601,6 +601,62 @@ let type_attributes = attrs => {
       },
     attrs,
   );
+};
+
+let rec type_expr_to_core_type = (env, expr) => {
+  let desc =
+    switch (expr.desc) {
+    | TTyVar(None) => TTyAny
+    | TTyVar(Some(name)) => TTyVar(name)
+    | TTyArrow(args, result, _) =>
+      TTyArrow(
+        List.map(type_expr_to_core_type(env), args),
+        type_expr_to_core_type(env, result),
+      )
+    | TTyTuple(args) =>
+      TTyTuple(List.map(type_expr_to_core_type(env), args))
+    | TTyRecord(fields) =>
+      TTyRecord(
+        List.map(
+          ((field, ty)) =>
+            (
+              Location.mknoloc(
+                Identifier.IdentName(Location.mknoloc(field)),
+              ),
+              type_expr_to_core_type(env, ty),
+            ),
+          fields,
+        ),
+      )
+    | TTyConstr(path, args, _) =>
+      TTyConstr(
+        path,
+        Location.mknoloc(
+          Identifier.IdentName(Location.mknoloc(Path.name(path))),
+        ),
+        List.map(type_expr_to_core_type(env), args),
+      )
+    | TTyUniVar(Some(name)) => TTyVar(name)
+    | TTyUniVar(None) => TTyAny
+    | TTyPoly(ty, args) =>
+      TTyPoly(
+        List.map(
+          fun
+          | {desc: TTyVar(Some(name))} => name
+          | _ => failwith("TTyPoly invalid type vars"),
+          args,
+        ),
+        type_expr_to_core_type(env, ty),
+      )
+    | TTyLink(ty) => type_expr_to_core_type(env, ty).ctyp_desc
+    | TTySubst(ty) => type_expr_to_core_type(env, ty).ctyp_desc
+    };
+  {
+    ctyp_desc: desc,
+    ctyp_type: expr,
+    ctyp_env: env,
+    ctyp_loc: Location.dummy_loc,
+  };
 };
 
 let report_error = (env, ppf) =>

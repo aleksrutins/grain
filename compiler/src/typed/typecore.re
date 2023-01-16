@@ -104,7 +104,8 @@ let prim0_type =
   | AllocateInt64
   | AllocateFloat32
   | AllocateFloat64
-  | AllocateRational => Builtin_types.type_wasmi32;
+  | AllocateRational => Builtin_types.type_wasmi32
+  | Unreachable => newvar(~name="a", ());
 
 let prim1_type =
   fun
@@ -120,6 +121,7 @@ let prim1_type =
   | NewInt64 => (Builtin_types.type_wasmi64, Builtin_types.type_wasmi32)
   | NewFloat32 => (Builtin_types.type_wasmf32, Builtin_types.type_wasmi32)
   | NewFloat64 => (Builtin_types.type_wasmf64, Builtin_types.type_wasmi32)
+  | BuiltinId => (Builtin_types.type_string, Builtin_types.type_wasmi32)
   | TagSimpleNumber => (Builtin_types.type_wasmi32, Builtin_types.type_number)
   | UntagSimpleNumber => (
       Builtin_types.type_number,
@@ -561,9 +563,9 @@ let unify_exp = (env, exp, expected_ty) => {
   unify_exp_types(loc, env, exp.exp_type, expected_ty);
 };
 
-let rec type_exp = (~recarg=?, env, sexp) =>
+let rec type_exp = (~in_function=?, ~recarg=?, env, sexp) =>
   /* We now delegate everything to type_expect */
-  type_expect(~recarg?, env, sexp, mk_expected(newvar()))
+  type_expect(~in_function?, ~recarg?, env, sexp, mk_expected(newvar()))
 
 /* Typing of an expression with an expected type.
      This provide better error messages, and allows controlled
@@ -599,6 +601,8 @@ and type_expect_ =
   let loc = sexp.pexp_loc;
   let attributes = Typetexp.type_attributes(sexp.pexp_attributes);
   /* Record the expression type before unifying it with the expected type */
+  let type_expect = type_expect(~in_function?);
+  let type_exp = type_exp(~in_function?);
   let with_explanation = with_explanation(explanation);
   let rue = exp => {
     with_explanation(() =>
@@ -725,7 +729,9 @@ and type_expect_ =
       exp_type: Builtin_types.type_void,
       exp_env: env,
     });
-  | PExpRecord(es) =>
+  | PExpRecord(b, es) =>
+    let opt_exp = Option.map(type_exp(env), b);
+
     let (ty_record, opath) = {
       let get_path = ty =>
         try({
@@ -737,9 +743,19 @@ and type_expect_ =
         | Not_found => None
         };
 
-      switch (get_path(ty_expected)) {
-      | None => (newvar(), None)
-      | op => (ty_expected, op)
+      let expected_opath = get_path(ty_expected);
+      let opt_exp_opath = Option.bind(opt_exp, exp => get_path(exp.exp_type));
+      switch (expected_opath, opt_exp_opath) {
+      | (None, None) => (newvar(), None)
+      | (Some(_), None)
+      | (Some((_, _, true)), Some(_)) => (ty_expected, expected_opath)
+      | (None | Some((_, _, false)), Some((_, p', _))) =>
+        let decl = Env.find_type(p', env);
+        begin_def();
+        let ty = newconstr(p', instance_list(env, decl.type_params));
+        end_def();
+        generalize_structure(ty);
+        (ty, opt_exp_opath);
       };
     };
 
@@ -781,7 +797,7 @@ and type_expect_ =
     );
 
     check_duplicates(lbl_exp_list);
-    let label_definitions = {
+    let (opt_exp, label_definitions) = {
       let (_lid, lbl, _lbl_exp) = List.hd(lbl_exp_list);
       let matching_label = lbl =>
         List.find(
@@ -789,33 +805,65 @@ and type_expect_ =
           lbl_exp_list,
         );
 
-      Array.map(
-        lbl =>
+      switch (opt_exp) {
+      | None =>
+        let label_definitions =
+          Array.map(
+            lbl =>
+              switch (matching_label(lbl)) {
+              | (lid, _lbl, lbl_exp) => Overridden(lid, lbl_exp)
+              | exception Not_found =>
+                let present_indices =
+                  List.map(((_, lbl, _)) => lbl.lbl_pos, lbl_exp_list);
+
+                let label_names = extract_label_names(env, ty_expected);
+                let rec missing_labels = n => (
+                  fun
+                  | [] => []
+                  | [lbl, ...rem] =>
+                    if (List.mem(n, present_indices)) {
+                      missing_labels(n + 1, rem);
+                    } else {
+                      [lbl, ...missing_labels(n + 1, rem)];
+                    }
+                );
+
+                let missing = missing_labels(0, label_names);
+                raise(Error(loc, env, Label_missing(missing)));
+              },
+            lbl.lbl_all,
+          );
+        (None, label_definitions);
+      | Some(exp) =>
+        let ty_exp = instance(env, exp.exp_type);
+        let unify_kept = lbl => {
+          let (_, ty_arg1, ty_res1) = instance_label(false, lbl);
+          unify_exp_types(exp.exp_loc, env, ty_exp, ty_res1);
           switch (matching_label(lbl)) {
-          | (lid, _lbl, lbl_exp) => Overridden(lid, lbl_exp)
+          | (lid, _lbl, lbl_exp) =>
+            // do not connect result types for overridden labels
+            Overridden(lid, lbl_exp)
           | exception Not_found =>
-            let present_indices =
-              List.map(((_, lbl, _)) => lbl.lbl_pos, lbl_exp_list);
-
-            let label_names = extract_label_names(env, ty_expected);
-            let rec missing_labels = n => (
-              fun
-              | [] => []
-              | [lbl, ...rem] =>
-                if (List.mem(n, present_indices)) {
-                  missing_labels(n + 1, rem);
-                } else {
-                  [lbl, ...missing_labels(n + 1, rem)];
-                }
+            let (_, ty_arg2, ty_res2) = instance_label(false, lbl);
+            unify_exp_types(loc, env, ty_arg1, ty_arg2);
+            with_explanation(() =>
+              unify_exp_types(loc, env, instance(env, ty_expected), ty_res2)
             );
-
-            let missing = missing_labels(0, label_names);
-            raise(Error(loc, env, Label_missing(missing)));
-          },
-        lbl.lbl_all,
-      );
+            Kept;
+          };
+        };
+        let label_definitions = Array.map(unify_kept, lbl.lbl_all);
+        (Some({...exp, exp_type: ty_exp}), label_definitions);
+      };
     };
-
+    let num_fields =
+      switch (lbl_exp_list) {
+      | [] => assert(false)
+      | [(_, lbl, _), ..._] => Array.length(lbl.lbl_all)
+      };
+    if (b != None && List.length(es) == num_fields) {
+      Location.prerr_warning(loc, Grain_utils.Warnings.UselessRecordSpread);
+    };
     let label_descriptions = {
       let (_, {lbl_all}, _) = List.hd(lbl_exp_list);
       lbl_all;
@@ -829,7 +877,7 @@ and type_expect_ =
       );
 
     re({
-      exp_desc: TExpRecord(fields),
+      exp_desc: TExpRecord(opt_exp, fields),
       exp_loc: loc,
       exp_extra: [],
       exp_attributes: attributes,
@@ -924,7 +972,7 @@ and type_expect_ =
     end_def();
     /*lower_args [] ty;*/
     begin_def();
-    let (args, ty_res) = type_application(env, funct, args);
+    let (args, ty_res) = type_application(~in_function?, env, funct, args);
     end_def();
     unify_var(env, newvar(), funct.exp_type);
     rue({
@@ -935,6 +983,8 @@ and type_expect_ =
       exp_type: ty_res,
       exp_env: env,
     });
+  | PExpConstruct(cstr, args) =>
+    type_construct(env, loc, cstr, args, ty_expected_explained, attributes)
   | PExpMatch(arg, branches) =>
     begin_def();
     let arg = type_exp(env, arg);
@@ -944,7 +994,15 @@ and type_expect_ =
     };
     generalize(arg.exp_type);
     let (val_cases, partial) =
-      type_cases(env, arg.exp_type, ty_expected, true, loc, branches);
+      type_cases(
+        ~in_function?,
+        env,
+        arg.exp_type,
+        ty_expected,
+        true,
+        loc,
+        branches,
+      );
     re({
       exp_desc: TExpMatch(arg, val_cases, partial),
       exp_loc: loc,
@@ -1174,6 +1232,33 @@ and type_expect_ =
       exp_type: Builtin_types.type_void,
       exp_env: env,
     })
+  | PExpReturn(sarg) =>
+    switch (in_function) {
+    | Some((_, _, ret_type)) =>
+      let arg =
+        switch (sarg) {
+        | Some(sarg) => Some(type_expect(env, sarg, mk_expected(ret_type)))
+        | None =>
+          with_explanation(() =>
+            unify_exp_types(
+              loc,
+              env,
+              instance(env, Builtin_types.type_void),
+              ret_type,
+            )
+          );
+          None;
+        };
+      rue({
+        exp_desc: TExpReturn(arg),
+        exp_loc: loc,
+        exp_extra: [],
+        exp_attributes: attributes,
+        exp_type: newvar(),
+        exp_env: env,
+      });
+    | None => failwith("Impossible: return outside of function")
+    }
   | PExpConstraint(sarg, styp) =>
     begin_def();
     let cty = Typetexp.transl_simple_type(env, false, styp);
@@ -1210,7 +1295,12 @@ and type_expect_ =
         ([expr], expr.exp_type);
       | [e, ...es] =>
         let expr =
-          type_statement_expr(~explanation=Sequence_left_hand_side, env, e);
+          type_statement_expr(
+            ~explanation=Sequence_left_hand_side,
+            ~in_function?,
+            env,
+            e,
+          );
         let (exprs, typ) = process_es(expr.exp_env, es);
         ([expr, ...exprs], typ);
       };
@@ -1240,11 +1330,7 @@ and type_function =
     (~in_function=?, loc, attrs, env, ty_expected_explained, l, caselist) => {
   let {ty: ty_expected, explanation} = ty_expected_explained;
   /*Format.eprintf "@[type_function: expected: %a@]@." Printtyp.raw_type_expr ty_expected;*/
-  let (loc_fun, ty_fun) =
-    switch (in_function) {
-    | Some(p) => p
-    | None => (loc, instance(env, ty_expected))
-    };
+  let (loc_fun, ty_fun) = (loc, instance(env, ty_expected));
 
   let separate =
     Grain_utils.Config.principal^ || Env.has_local_constraints(env);
@@ -1257,7 +1343,7 @@ and type_function =
     | [{pmb_pat: {ppat_desc: PPatConstraint(p, _)}, _} as mb] =>
       arity([{...mb, pmb_pat: p}])
     | [{pmb_pat: {ppat_desc: PPatTuple(args)}, _}] => List.length(args)
-    /* FIXME: Less hard-coding, please */
+    // TODO(#1507): Reduce the number of hard-coded cases
     | [{pmb_pat: {ppat_desc: PPatConstruct({txt: ident, _}, []), _}, _}]
         when Identifier.equal(ident, Identifier.IdentName(mknoloc("()"))) => 0
     | _ => failwith("Impossible: type_function: impossible caselist")
@@ -1295,7 +1381,7 @@ and type_function =
     };
   let (cases, partial) =
     type_cases(
-      ~in_function=(loc_fun, ty_fun),
+      ~in_function=(loc_fun, ty_arg, ty_res),
       env,
       normalized_arg_type,
       ty_res,
@@ -1315,13 +1401,15 @@ and type_function =
   });
 }
 
-and type_arguments = (~recarg=?, env, sargs, tys_expected', tys_expected) =>
+and type_arguments =
+    (~in_function=?, ~recarg=?, env, sargs, tys_expected', tys_expected) =>
   /* ty_expected' may be generic */
   /* Note (Philip): I think the heavy lifting of this function
      was there to support optional arguments (which we currently don't). */
   List.map2(
     (sarg, (targ', targ)) => {
-      let texp = type_expect(~recarg?, env, sarg, mk_expected(targ'));
+      let texp =
+        type_expect(~in_function?, ~recarg?, env, sarg, mk_expected(targ'));
       unify_exp(env, texp, targ);
       texp;
     },
@@ -1329,7 +1417,7 @@ and type_arguments = (~recarg=?, env, sargs, tys_expected', tys_expected) =>
     List.combine(tys_expected', tys_expected),
   )
 
-and type_application = (env, funct, args) => {
+and type_application = (~in_function=?, env, funct, args) => {
   /* funct.exp_type may be generic */
   /*** Arguments, return value */
   let ty_fun = expand_head(env, funct.exp_type);
@@ -1382,11 +1470,17 @@ and type_application = (env, funct, args) => {
     };
 
   let typed_args =
-    type_arguments(env, args, ty_args, List.map(instance(env), ty_args));
+    type_arguments(
+      ~in_function?,
+      env,
+      args,
+      ty_args,
+      List.map(instance(env), ty_args),
+    );
   (typed_args, instance(env, ty_ret));
 }
 
-and type_construct = (env, loc, lid, sarg, ty_expected_explained, attrs) => {
+and type_construct = (env, loc, lid, sargs, ty_expected_explained, attrs) => {
   let {ty: ty_expected, explanation} = ty_expected_explained;
   let opath =
     try({
@@ -1399,7 +1493,6 @@ and type_construct = (env, loc, lid, sarg, ty_expected_explained, attrs) => {
     }) {
     | Not_found => None
     };
-
   let constrs = Typetexp.find_all_constructors(env, lid.loc, lid.txt);
   let constr =
     wrap_disambiguate(
@@ -1408,15 +1501,6 @@ and type_construct = (env, loc, lid, sarg, ty_expected_explained, attrs) => {
       Constructor.disambiguate(lid, env, opath),
       constrs,
     );
-  /*Env.mark_constructor Env.Positive env (Identifier.last lid.txt) constr;*/
-  let sargs =
-    switch (sarg) {
-    | None => []
-    | Some({pexp_desc: PExpTuple(sel)}) when constr.cstr_arity > 1 =>
-      /*|| Builtin_attributes.explicit_arity attrs*/
-      sel
-    | Some(se) => [se]
-    };
   if (List.length(sargs) != constr.cstr_arity) {
     raise(
       Error(
@@ -1491,10 +1575,10 @@ and type_construct = (env, loc, lid, sarg, ty_expected_explained, attrs) => {
 
 /* Typing of statements (expressions whose values are discarded) */
 
-and type_statement_expr = (~explanation=?, env, sexp) => {
+and type_statement_expr = (~explanation=?, ~in_function=?, env, sexp) => {
   let loc = final_subexpression(sexp).pexp_loc;
   begin_def();
-  let exp = type_exp(env, sexp);
+  let exp = type_exp(~in_function?, env, sexp);
   end_def();
   let ty = expand_head(env, exp.exp_type)
   and tv = newvar();
@@ -1646,12 +1730,6 @@ and type_cases =
     List.iter(iter_pattern(({pat_type: t}) => generalize(t)), patl);
   };
   /* type bodies */
-  let in_function =
-    if (List.length(caselist) == 1) {
-      in_function;
-    } else {
-      None;
-    };
   let cases =
     List.map2(
       ((pat, (ext_env, unpacks)), {pmb_pat, pmb_body, pmb_guard, pmb_loc}) => {
@@ -1675,6 +1753,7 @@ and type_cases =
           | Some(scond) =>
             Some(
               type_expect(
+                ~in_function?,
                 ext_env,
                 scond,
                 mk_expected(Builtin_types.type_bool),
@@ -1979,17 +2058,21 @@ and type_let =
         (fun () ->
            Location.prerr_warning pvb_pat.ppat_loc Warnings.Unused_rec_flag
         )
-    end;
-    List.iter2
-      (fun pat (attrs, exp) ->
-         Builtin_attributes.warning_scope ~ppwarning:false attrs
-           (fun () ->
-              ignore(check_partial env pat.pat_type pat.pat_loc
-                       [case pat exp])
-           )
+    end;*/
+  List.iter2(
+    (pat, (attrs, exp)) => {
+      ignore(
+        check_partial(
+          env,
+          pat.pat_type,
+          pat.pat_loc,
+          [{mb_pat: pat, mb_body: exp, mb_guard: None, mb_loc: pat.pat_loc}],
+        ),
       )
-      pat_list
-      (List.map2 (fun (attrs, _) e -> attrs, e) spatl exp_list);*/
+    },
+    pat_list,
+    List.map2(((attrs, _), e) => (attrs, e), spatl, exp_list),
+  );
   end_def();
   let mutable_let = mut_flag == Mutable;
   List.iter2(

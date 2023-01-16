@@ -24,6 +24,10 @@ type listitem('a) =
   | ListItem('a)
   | ListSpread('a, Location.t);
 
+type recorditem =
+  | RecordItem(loc(Identifier.t), expression)
+  | RecordSpread(expression, Location.t);
+
 type id = loc(Identifier.t);
 type str = loc(string);
 type loc = Location.t;
@@ -113,8 +117,15 @@ module Exp: {
   let tuple:
     (~loc: loc=?, ~attributes: attributes=?, list(expression)) => expression;
   let record:
-    (~loc: loc=?, ~attributes: attributes=?, list((id, expression))) =>
+    (
+      ~loc: loc=?,
+      ~attributes: attributes=?,
+      option(expression),
+      list((id, expression))
+    ) =>
     expression;
+  let record_fields:
+    (~loc: loc=?, ~attributes: attributes=?, list(recorditem)) => expression;
   let record_get:
     (~loc: loc=?, ~attributes: attributes=?, expression, id) => expression;
   let record_set:
@@ -187,6 +198,8 @@ module Exp: {
     expression;
   let continue: (~loc: loc=?, ~attributes: attributes=?, unit) => expression;
   let break: (~loc: loc=?, ~attributes: attributes=?, unit) => expression;
+  let return:
+    (~loc: loc=?, ~attributes: attributes=?, option(expression)) => expression;
   let constraint_:
     (~loc: loc=?, ~attributes: attributes=?, expression, parsed_type) =>
     expression;
@@ -201,6 +214,9 @@ module Exp: {
     expression;
   let apply:
     (~loc: loc=?, ~attributes: attributes=?, expression, list(expression)) =>
+    expression;
+  let construct:
+    (~loc: loc=?, ~attributes: attributes=?, id, list(expression)) =>
     expression;
   let binop:
     (~loc: loc=?, ~attributes: attributes=?, expression, list(expression)) =>

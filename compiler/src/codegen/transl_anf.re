@@ -233,6 +233,7 @@ module RegisterAllocation = {
         )
       | MContinue => MContinue
       | MBreak => MBreak
+      | MReturn(v) => MReturn(Option.map(apply_allocations(ty, allocs), v))
       | MSwitch(v, bs, d, ty) =>
         MSwitch(
           apply_allocation_to_imm(v),
@@ -322,6 +323,7 @@ let run_register_allocation = (instrs: list(Mashtree.instr)) => {
     | MPrim0(_)
     | MContinue
     | MBreak => []
+    | MReturn(v) => Option.fold(~none=[], ~some=live_locals, v)
     | MSwitch(v, bs, d, ty) =>
       imm_live_local(v)
       @ List.concat(List.map(((_, b)) => block_live_locals(b), bs))
@@ -580,7 +582,8 @@ let compile_lambda =
   //       of recursive functions to be garbage-collectible, since
   //       Grain's garbage collector does not currently collect
   //       cyclic reference chains)
-  let used_var_set = Ident.Set.remove(id, Anf_utils.anf_free_vars(body));
+  let used_var_set =
+    Ident.Set.remove(id, Analyze_free_vars.anf_free_vars(body));
   let arg_vars = List.map(((arg, _)) => arg, args);
   let global_vars =
     Ident.fold_all((id, _, acc) => [id, ...acc], global_table^, []);
@@ -786,6 +789,7 @@ let rec compile_comp = (~id=?, env, c) => {
       )
     | CContinue => MContinue
     | CBreak => MBreak
+    | CReturn(e) => MReturn(Option.map(compile_comp(env), e))
     | CPrim0(p0) => MPrim0(p0)
     | CPrim1(Box, arg)
     | CPrim1(BoxBind, arg) => MAllocate(MBox(compile_imm(env, arg)))
@@ -821,7 +825,11 @@ let rec compile_comp = (~id=?, env, c) => {
         MRecord(
           compile_imm(env, ttag),
           List.map(
-            (({txt: name}, arg)) => (name, compile_imm(env, arg)),
+            ((name, arg)) =>
+              (
+                Option.map(({txt: name}) => name, name),
+                compile_imm(env, arg),
+              ),
             args,
           ),
         ),
@@ -1355,71 +1363,6 @@ let transl_signature = (~functions, ~imports, signature) => {
             }
           | ReprValue(_) => TSigValue(vid, vd)
           };
-        }
-      | TSigType(tid, {type_kind: TDataVariant(cds)} as td, rs) => {
-          let cds =
-            List.map(
-              ({cd_id, cd_repr} as cd) => {
-                exports :=
-                  [
-                    GlobalExport({
-                      ex_global_name: Ident.name(cd_id),
-                      ex_global_internal_name: Ident.unique_name(cd_id),
-                    }),
-                    ...exports^,
-                  ];
-                switch (cd_repr) {
-                | ReprFunction(args, res, _) =>
-                  let external_name = Ident.name(cd_id);
-                  let internal_name = Ident.unique_name(cd_id);
-                  exports :=
-                    [
-                      FunctionExport({
-                        ex_function_name: external_name,
-                        ex_function_internal_name: internal_name,
-                      }),
-                      ...exports^,
-                    ];
-                  {
-                    ...cd,
-                    cd_repr: ReprFunction(args, res, Direct(internal_name)),
-                  };
-                | ReprValue(_) => cd
-                };
-              },
-              cds,
-            );
-          TSigType(tid, {...td, type_kind: TDataVariant(cds)}, rs);
-        }
-      | TSigTypeExt(tid, {ext_name, ext_args, ext_repr} as cstr, rs) => {
-          exports :=
-            [
-              GlobalExport({
-                ex_global_name: Ident.name(ext_name),
-                ex_global_internal_name: Ident.unique_name(ext_name),
-              }),
-              ...exports^,
-            ];
-          let cstr =
-            switch (ext_repr) {
-            | ReprFunction(args, res, _) =>
-              let external_name = Ident.name(ext_name);
-              let internal_name = Ident.unique_name(ext_name);
-              exports :=
-                [
-                  FunctionExport({
-                    ex_function_name: external_name,
-                    ex_function_internal_name: internal_name,
-                  }),
-                  ...exports^,
-                ];
-              {
-                ...cstr,
-                ext_repr: ReprFunction(args, res, Direct(internal_name)),
-              };
-            | ReprValue(_) => cstr
-            };
-          TSigTypeExt(tid, cstr, rs);
         }
       | _ as item => item,
       signature.Cmi_format.cmi_sign,

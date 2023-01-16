@@ -16,6 +16,8 @@ describe("basic functionality", ({test, testSkip}) => {
   assertSnapshot("neg", "-40");
   assertSnapshot("simple_min", "-1073741824");
   assertSnapshot("simple_max", "1073741823");
+  assertSnapshot("bigint_start_neg", "-0xffff_ffff_ffff_ffff");
+  assertSnapshot("bigint_start_pos", "0xffff_ffff_ffff_ffff");
   assertSnapshot("heap_number_i32_wrapper", "1073741824");
   assertSnapshot("heap_number_i32_wrapper_max", "2147483647");
   assertSnapshot("heap_number_i64_wrapper", "2147483648");
@@ -27,6 +29,9 @@ describe("basic functionality", ({test, testSkip}) => {
   assertSnapshot("oct_neg", "-0o77");
   assertSnapshot("fals", "let x = false; x");
   assertSnapshot("tru", "let x = true; x");
+  assertSnapshot("infinity", "let x = Infinity; x");
+  assertSnapshot("infinity_neg", "let x = -Infinity; x");
+  assertSnapshot("nan", "let x = NaN; x");
   assertSnapshot(
     "complex1",
     "\n    let x = 2, y = 3, z = if (true) { 4 } else { 5 };\n    if (true) {\n      print(y)\n      y - (z + x)\n    } else {\n      print(8)\n      8\n    }\n    ",

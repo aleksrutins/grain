@@ -53,27 +53,6 @@ export enum List<a> {
 }
 
 /**
- * Grain's type representing something that may or may not contain data.
- * Think of this like a better, type-safe "null".
- *
- * @since v0.2.0
- */
-export enum Option<a> {
-  Some(a),
-  None,
-}
-
-/**
- * Grain's type representing the result of something that might error.
- *
- * @since v0.2.0
- */
-export enum Result<t, e> {
-  Ok(t),
-  Err(e),
-}
-
-/**
  * @section Boolean operations: Infix functions for working with Boolean values.
  */
 
@@ -473,9 +452,10 @@ export primitive ignore: a -> Void = "@ignore"
 
 /**
  * Assert that the given Boolean condition is `true`.
- * Throws an `AssertionError` if the condition is `false`.
  *
  * @param condition: The condition to assert
+ *
+ * @throws AssertionError: When the `condition` is false
  *
  * @example assert 3 > 2
  * @example assert true
@@ -578,7 +558,7 @@ export let cons = (a, b) =>
 export let empty = [] // <- for parity with `cons`, but should be deleted as well
 
 // Setup exception printing
-@disableGC
+@unsafe
 let rec setupExceptions = () => {
   Exception.dangerouslyRegisterPrinter(e => {
     match (e) {
@@ -589,8 +569,6 @@ let rec setupExceptions = () => {
   })
 
   Exception.dangerouslyRegisterBasePrinter(e => Some(toString(e)))
-  Memory.decRef(WasmI32.fromGrain(setupExceptions))
-  void
 }
 
 setupExceptions()

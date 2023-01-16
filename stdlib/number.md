@@ -17,6 +17,32 @@ import Number from "number"
 
 Number constant values.
 
+### Number.**nan**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+nan : Number
+```
+
+NaN represented as a Number value.
+
+### Number.**infinity**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+infinity : Number
+```
+
+Infinity represented as a Number value.
+
 ### Number.**pi**
 
 <details disabled>
@@ -164,6 +190,57 @@ Returns:
 |----|-----------|
 |`Number`|The quotient of the two operands|
 
+### Number.**pow**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+pow : (Number, Number) -> Number
+```
+
+Computes the exponentiation of the given base and power.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`base`|`Number`|The base number|
+|`power`|`Number`|The exponent number|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The base raised to the given power|
+
+### Number.**exp**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+exp : Number -> Number
+```
+
+Computes the exponentiation of Euler's number to the given power.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`power`|`Number`|The exponent number|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The `Number.e` value raised to the given power|
+
 ### Number.**sqrt**
 
 <details disabled>
@@ -225,9 +302,16 @@ Number.sign(0) == 0
 
 ### Number.**min**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -251,9 +335,16 @@ Returns:
 
 ### Number.**max**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -277,9 +368,16 @@ Returns:
 
 ### Number.**ceil**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -302,9 +400,16 @@ Returns:
 
 ### Number.**floor**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -327,9 +432,16 @@ Returns:
 
 ### Number.**trunc**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -352,9 +464,16 @@ Returns:
 
 ### Number.**round**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.4.0</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.4.0</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity properly</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -537,8 +656,7 @@ No other changes yet.
 isNaN : Number -> Bool
 ```
 
-Checks if a number contains the NaN value (Not A Number).
-Only boxed floating point numbers can contain NaN.
+Checks if a number is the float NaN value (Not A Number).
 
 Parameters:
 
@@ -610,11 +728,70 @@ Returns:
 |----|-----------|
 |`Result<Number, String>`|`Ok(value)` containing the parsed number on a successful parse or `Err(msg)` containing an error message string otherwise|
 
-### Number.**sin**
+### Number.**parseFloat**
 
 <details disabled>
-<summary tabindex="-1">Added in <code>0.5.2</code></summary>
+<summary tabindex="-1">Added in <code>0.5.5</code></summary>
 No other changes yet.
+</details>
+
+```grain
+parseFloat : String -> Result<Number, String>
+```
+
+Parses a string representation of a float into a `Number`. Underscores that appear
+in numeric portions of the input are ignored.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`input`|`String`|The string to parse|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Result<Number, String>`|`Ok(value)` containing the parsed number on a successful parse or `Err(msg)` containing an error message string otherwise|
+
+### Number.**parse**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.5</code></summary>
+No other changes yet.
+</details>
+
+```grain
+parse : String -> Result<Number, String>
+```
+
+Parses a string representation of an integer, float, or rational into a `Number`.
+Underscores that appear in the numeric portion of the input are ignored.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`input`|`String`|The string to parse|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Result<Number, String>`|`Ok(value)` containing the parsed number on a successful parse or `Err(msg)` containing an error message string otherwise|
+
+### Number.**sin**
+
+<details>
+<summary>Added in <code>0.5.2</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -637,9 +814,16 @@ Returns:
 
 ### Number.**cos**
 
-<details disabled>
-<summary tabindex="-1">Added in <code>0.5.2</code></summary>
-No other changes yet.
+<details>
+<summary>Added in <code>0.5.2</code></summary>
+<table>
+<thead>
+<tr><th>version</th><th>changes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0.5.4</code></td><td>Handle NaN and Infinity</td></tr>
+</tbody>
+</table>
 </details>
 
 ```grain
@@ -659,4 +843,141 @@ Returns:
 |type|description|
 |----|-----------|
 |`Number`|The computed cosine|
+
+### Number.**tan**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+tan : Number -> Number
+```
+
+Computes the tangent of a number (in radians) using Chebyshev polynomials.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`radians`|`Number`|The input in radians|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The computed tangent|
+
+### Number.**gamma**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+gamma : Number -> Number
+```
+
+Computes the gamma function of a value using Lanczos approximation.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`z`|`Number`|The value to interpolate|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The gamma of the given value|
+
+Throws:
+
+`InvalidArgument(String)`
+
+* When `z` is zero
+
+### Number.**factorial**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+factorial : Number -> Number
+```
+
+Computes the product of consecutive integers for an integer input and computes the gamma function for non-integer inputs.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`n`|`Number`|The value to factorialize|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The factorial of the given value|
+
+Throws:
+
+`InvalidArgument(String)`
+
+* When `n` is negative
+
+### Number.**toRadians**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+toRadians : Number -> Number
+```
+
+Converts degrees to radians.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`degrees`|`Number`|The value to convert|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The value in radians|
+
+### Number.**toDegrees**
+
+<details disabled>
+<summary tabindex="-1">Added in <code>0.5.4</code></summary>
+No other changes yet.
+</details>
+
+```grain
+toDegrees : Number -> Number
+```
+
+Converts radians to degrees.
+
+Parameters:
+
+|param|type|description|
+|-----|----|-----------|
+|`radians`|`Number`|The value to convert|
+
+Returns:
+
+|type|description|
+|----|-----------|
+|`Number`|The value in degrees|
 
